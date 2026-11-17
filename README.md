@@ -28,7 +28,7 @@
 
 ```bash
 # 从源码运行（当前版本）
-git clone https://github.com/<your-name>/token-ledger.git
+git clone https://github.com/1416459545-bot/token-ledger.git
 cd token-ledger
 node src/cli.ts scan      # 扫描本地 Claude Code 日志
 node src/cli.ts report    # 看本月的账
