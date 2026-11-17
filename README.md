@@ -66,6 +66,7 @@ DAY         CALLS  TOKENS   COST
 | 命令 | 作用 |
 | --- | --- |
 | `scan` | 扫描本地日志并入库（增量：没改动的文件自动跳过） |
+| `import <file.jsonl>` | 导入任意工具的用量数据（通用 JSONL 格式） |
 | `report` | 看某个月的账，默认本月 |
 | `budget set <金额>` | 设定月度预算（美元） |
 | `budget show` | 看余额、剩余天数、日均还能花多少 |
@@ -96,6 +97,7 @@ node src/cli.ts report --json                 # 机器可读
 - ✅ 跨项目、跨模型、跨天聚合
 - ✅ 预算与「日均还能吃多少」
 - ✅ 自定义模型价格表
+- ✅ 通用 JSONL 导入：还没适配的工具，只要导出用量就能记账
 - ✅ 未知模型不瞎猜价格，标 `n/a` 并提示你补
 
 **暂不支持：**
@@ -105,6 +107,33 @@ node src/cli.ts report --json                 # 机器可读
 - ❌ Web 界面、团队协作、云同步
 
 > 少做点功能，才有可能真的发出去。
+
+## 导入任意工具的用量数据
+
+还没适配你的工具？只要它能把用量导出成 JSONL，就能进账本：
+
+```bash
+node src/cli.ts import usage.jsonl --project my-app
+```
+
+每行一条 JSON，只有三个必填字段：
+
+```json
+{"ts":"2026-11-10T10:00:00Z","model":"gpt-4o","input_tokens":1000,"output_tokens":500}
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `ts` / `timestamp` | 必填，任何能被 `Date` 解析的时间 |
+| `model` | 必填，用于查价格表 |
+| `input_tokens` / `output_tokens` | 至少填一个 token 字段 |
+| `cache_read_tokens` / `cache_write_tokens` | 可选 |
+| `provider` / `project` / `session_id` | 可选 |
+
+- 字段同时接受 camelCase（如 `inputTokens`）。
+- 空行与 `#` 开头的行会被忽略。
+- **重复导入不会重复记账**：主键是内容哈希。
+- 没写 `project` 的行可以用 `--project` 统一补上。
 
 ## 隐私承诺
 

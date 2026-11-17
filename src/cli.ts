@@ -2,11 +2,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { openDb, dbFile } from './core/db.ts';
-import { aggregate, detailRows, eventCount, listMonths, totals as queryTotals, unpricedModels } from './core/ledger.ts';
+import { aggregate, detailRows, eventCount, insertEvents, listMonths, totals as queryTotals, unpricedModels } from './core/ledger.ts';
 import { budgetStatus, clearBudget, setBudget } from './core/budget.ts';
 import { loadPricing } from './core/pricing.ts';
-import { scanClaude } from './core/scanner.ts';
+import { priceEvents, scanClaude } from './core/scanner.ts';
 import { defaultClaudeRoot, findJsonlFiles } from './sources/claude.ts';
+import { parseImportFile } from './sources/generic.ts';
 import { renderReport } from './output/report.ts';
 import { renderCsv, renderMarkdown } from './output/markdown.ts';
 import { DEFAULT_BOWL_SIZE, renderRice } from './output/rice.ts';
@@ -86,6 +87,7 @@ const HELP = `token-ledger · 本地优先的 AI token 花费账本
 
 命令
   scan                扫描本地 Claude Code 日志并记账
+  import <file.jsonl> 导入任意工具的用量数据（通用 JSONL 格式）
   report              看某个月的账（默认本月）
   budget set <金额>   设定月度预算（美元）
   budget show         看预算余额
@@ -98,6 +100,7 @@ const HELP = `token-ledger · 本地优先的 AI token 花费账本
   --month YYYY-MM                 指定月份
   --by model|project|day|source   report 只看某一个维度
   --root <dir>                    scan 的日志目录
+  --project <名称>                import 时给没有 project 字段的记录补上归属
   --force                         scan 忽略增量缓存，全量重扫
   --format md|csv                 export 的输出格式（默认 md）
   --out <file>                    export 写入文件
@@ -171,6 +174,53 @@ function cmdScan(parsed: ParsedArgs): number {
   for (const warning of pricing.warnings) print(`⚠ ${warning}`);
   print('');
   print(`账本：${dbFile(home)}`);
+  return 0;
+}
+
+function cmdImport(parsed: ParsedArgs): number {
+  const target = parsed.positionals[0];
+  if (target === undefined) {
+    printErr('用法：token-ledger import <file.jsonl> [--project 名称] [--json]');
+    return 1;
+  }
+
+  const file = path.resolve(expandHome(target));
+  if (!fs.existsSync(file)) {
+    printErr(`文件不存在：${file}`);
+    return 1;
+  }
+
+  const home = ledgerHome();
+  const db = openDb(home);
+  const pricing = loadPricing(home);
+  const project = flagStr(parsed.flags, 'project') ?? null;
+
+  const parsedFile = parseImportFile(file, project);
+  const { priced, unpricedModels } = priceEvents(parsedFile.events, pricing.entries);
+  const inserted = insertEvents(db, priced);
+
+  if (parsed.flags.json === true) {
+    print(
+      JSON.stringify(
+        { file, ...parsedFile.stats, inserted, unpricedModels },
+        null,
+        2,
+      ),
+    );
+    return 0;
+  }
+
+  print(`导入 ${file}`);
+  print(
+    `  解析 ${parsedFile.stats.lines} 行 · 有效 ${parsedFile.stats.events} 条 · 新增 ${inserted} 条（重复自动跳过）`,
+  );
+  if (parsedFile.stats.skipped > 0) {
+    print(`  跳过 ${parsedFile.stats.skipped} 行（缺字段 / 坏 JSON / 零消耗）`);
+  }
+  if (unpricedModels.length > 0) {
+    print(`  未定价模型：${unpricedModels.join(', ')}（成本记为 n/a）`);
+  }
+  for (const warning of pricing.warnings) print(`⚠ ${warning}`);
   return 0;
 }
 
@@ -384,6 +434,8 @@ function main(): number {
       return 0;
     case 'scan':
       return cmdScan(parsed);
+    case 'import':
+      return cmdImport(parsed);
     case 'report':
       return cmdReport(parsed);
     case 'budget':

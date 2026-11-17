@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- `import <file.jsonl>`：通用 JSONL 用量导入。任何工具导出的用量都能进账本，主键为内容哈希，重复导入不重复记账
+
 ### Fixed
 
 - 跨平台项目名推断：`cwd` 含 Windows 反斜杠时，在 macOS / Linux 上会退化成整条路径（现改为同时识别 `\` 与 `/`）

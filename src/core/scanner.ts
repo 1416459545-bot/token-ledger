@@ -38,7 +38,7 @@ export function priceEvents(events: UsageEvent[], prices: Record<string, PriceEn
     const resolved = resolvePrice(event.model, prices);
     if (resolved === null) {
       unpriced.add(event.model);
-      return { ...event, provider: 'unknown', costUsd: null };
+      return { ...event, costUsd: null };
     }
     const cost = costOf(
       {
@@ -49,7 +49,9 @@ export function priceEvents(events: UsageEvent[], prices: Record<string, PriceEn
       },
       resolved.entry,
     );
-    return { ...event, provider: resolved.entry.provider, costUsd: cost };
+    // 数据源自带的 provider 优先（例如通用导入里显式写了 provider）
+    const provider = event.provider !== 'unknown' ? event.provider : resolved.entry.provider;
+    return { ...event, provider, costUsd: cost };
   });
   return { priced, unpricedModels: [...unpriced] };
 }

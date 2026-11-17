@@ -1,0 +1,8 @@
+{"ts":"2026-11-10T10:00:00Z","model":"gpt-4o","provider":"openai","input_tokens":1000,"output_tokens":500,"project":"alpha"}
+{"ts":"2026-11-10T11:00:00Z","model":"gpt-4o-mini","inputTokens":200,"outputTokens":100,"cacheReadTokens":50}
+{"timestamp":"2026-11-11T00:00:00+08:00","model":"claude-opus","input_tokens":10,"output_tokens":5}
+# 这一行是注释，应被忽略
+this line is not json
+{"ts":"2026-11-11T01:00:00Z","model":"gpt-4o","input_tokens":0,"output_tokens":0}
+{"model":"missing-timestamp","input_tokens":5,"output_tokens":5}
+{"ts":"2026-11-10T10:00:00Z","model":"gpt-4o","provider":"openai","input_tokens":1000,"output_tokens":500,"project":"alpha"}
