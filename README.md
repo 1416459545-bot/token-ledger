@@ -174,7 +174,7 @@ TOKEN_LEDGER_HOME=~/my-ledger node src/cli.ts report
 ## 开发
 
 ```bash
-node --test test        # 跑测试（不需要 npm install）
+node --test             # 跑测试（不需要 npm install）
 node src/cli.ts doctor  # 自己诊断一下
 ```
 

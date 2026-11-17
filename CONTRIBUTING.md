@@ -8,7 +8,7 @@
 - **不需要** `npm install` —— 本项目零运行时依赖，测试用 Node 内置的 `node:test`
 
 ```bash
-node --test test
+node --test
 node src/cli.ts doctor
 ```
 

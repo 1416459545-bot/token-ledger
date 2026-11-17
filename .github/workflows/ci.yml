@@ -31,12 +31,14 @@ jobs:
           node --version
           node -e "console.log('typescript support:', process.features.typescript ?? 'undefined')"
 
-      # 注意：必须 set -o pipefail，否则 | tee 会把测试的失败码吞掉，变成假绿
+      # node --test 用默认发现（test/**/*.test.*）。
+      # 不要用 `node --test test`：Node 24 不把目录当目录，会报 MODULE_NOT_FOUND。
+      # 必须 set -o pipefail，否则 | tee 会把失败码吞掉变成假绿。
       - name: Test
         shell: bash
         run: |
           set -o pipefail
-          node --test test 2>&1 | tee test.log
+          node --test 2>&1 | tee test.log
 
       - name: Test summary
         if: always()

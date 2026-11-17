@@ -73,13 +73,25 @@ export function cacheWriteTokensOf(usage: Record<string, unknown>): number {
   return 0;
 }
 
+/**
+ * 取路径最后一段，**同时兼容 Windows 反斜杠与 POSIX 斜杠**。
+ * 不能用 path.basename：它只认当前平台的分隔符，在 Linux 上遇到 `C:\work\alpha` 会原样返回。
+ */
+function lastSegment(p: string): string {
+  const parts = p
+    .replace(/[\\/]+$/, '')
+    .split(/[\\/]/)
+    .filter((segment) => segment !== '');
+  return parts.length > 0 ? parts[parts.length - 1] : '';
+}
+
 /** 从 `cwd` 或会话目录名推断项目名。 */
 export function projectOf(cwd: unknown, filePath: string): string | null {
   if (typeof cwd === 'string' && cwd.trim() !== '') {
-    const base = path.basename(cwd.replace(/[\\/]+$/, ''));
+    const base = lastSegment(cwd);
     if (base !== '') return base;
   }
-  const dirName = path.basename(path.dirname(filePath));
+  const dirName = lastSegment(path.dirname(filePath));
   const cleaned = dirName.replace(/^[A-Za-z]--/, '');
   const segments = cleaned.split('-').filter(Boolean);
   return segments.length > 0 ? segments[segments.length - 1] : null;
