@@ -1,0 +1,89 @@
+name: Token Ledger
+description: 在 PR 里评论 AI 的 token 用量与预估花费（本地优先，不上传任何对话内容）
+
+branding:
+  icon: 'activity'
+  color: 'green'
+
+# 刻意不给 inputs 设上下文默认值：composite action 里 default 使用上下文容易踩坑，
+# 统一在脚本里用 ${VAR:-默认值} 兜底。
+inputs:
+  github-token:
+    description: 用于发表评论的 token，默认使用仓库自带的 GITHUB_TOKEN
+    required: false
+    default: ''
+  month:
+    description: 统计月份（YYYY-MM），留空则用本月
+    required: false
+    default: ''
+  import-file:
+    description: 可选的用量文件路径（通用 JSONL 格式）
+    required: false
+    default: ''
+  pr-number:
+    description: PR 编号，默认取当前 pull_request 事件
+    required: false
+    default: ''
+  api-url:
+    description: GitHub API 地址（GitHub Enterprise Server 用）
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24.x'
+
+    - name: Scan logs on runner
+      shell: bash
+      env:
+        TOKEN_LEDGER_HOME: ${{ github.workspace }}/.token-ledger
+      run: |
+        set -euo pipefail
+        CLI="${{ github.action_path }}/src/cli.ts"
+        node "$CLI" scan || echo "::warning::scan 没找到可统计的日志，继续执行"
+
+    - name: Import usage file (optional)
+      shell: bash
+      env:
+        TOKEN_LEDGER_HOME: ${{ github.workspace }}/.token-ledger
+        IMPORT_FILE: ${{ inputs.import-file }}
+      run: |
+        set -euo pipefail
+        CLI="${{ github.action_path }}/src/cli.ts"
+        if [ -z "${IMPORT_FILE}" ]; then
+          echo "::notice::没有提供 import-file，跳过导入"
+          exit 0
+        fi
+        node "$CLI" import "$IMPORT_FILE"
+
+    - name: Comment on PR
+      shell: bash
+      env:
+        TOKEN_LEDGER_HOME: ${{ github.workspace }}/.token-ledger
+        TOKEN_LEDGER_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        INPUT_TOKEN: ${{ inputs.github-token }}
+        DEFAULT_TOKEN: ${{ github.token }}
+        INPUT_PR: ${{ inputs.pr-number }}
+        EVENT_PR: ${{ github.event.pull_request.number }}
+        MONTH: ${{ inputs.month }}
+        API_URL: ${{ inputs.api-url || github.api_url }}
+      run: |
+        set -euo pipefail
+        CLI="${{ github.action_path }}/src/cli.ts"
+        export GITHUB_TOKEN="${INPUT_TOKEN:-$DEFAULT_TOKEN}"
+
+        PR="${INPUT_PR:-${EVENT_PR}}"
+        if [ -z "${PR}" ]; then
+          echo "::notice::没有 PR 编号（需要 pull_request 事件），跳过评论"
+          exit 0
+        fi
+
+        ARGS=(--repo "${{ github.repository }}" --issue "$PR")
+        if [ -n "${MONTH}" ]; then ARGS+=(--month "$MONTH"); fi
+        if [ -n "${API_URL}" ]; then ARGS+=(--api-url "$API_URL"); fi
+
+        node "$CLI" comment "${ARGS[@]}"

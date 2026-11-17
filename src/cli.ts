@@ -8,6 +8,7 @@ import { loadPricing } from './core/pricing.ts';
 import { priceEvents, scanSources } from './core/scanner.ts';
 import { SOURCES, SOURCE_NAMES, findSource } from './sources/index.ts';
 import { parseImportFile } from './sources/generic.ts';
+import { buildCommentBody, upsertComment } from './github/comment.ts';
 import { renderReport } from './output/report.ts';
 import { renderCsv, renderMarkdown } from './output/markdown.ts';
 import { DEFAULT_BOWL_SIZE, renderRice } from './output/rice.ts';
@@ -88,6 +89,7 @@ const HELP = `token-ledger · 本地优先的 AI token 花费账本
 命令
   scan                扫描本地 Claude Code 日志并记账
   import <file.jsonl> 导入任意工具的用量数据（通用 JSONL 格式）
+  comment             在 PR 里发布/更新 token 用量评论
   report              看某个月的账（默认本月）
   budget set <金额>   设定月度预算（美元）
   budget show         看预算余额
@@ -102,6 +104,9 @@ const HELP = `token-ledger · 本地优先的 AI token 花费账本
   --source claude-code|codex|all  scan 的数据源（默认 all）
   --root <dir>                    scan 的日志目录（需配合 --source 指定单个数据源）
   --project <名称>                import 时给没有 project 字段的记录补上归属
+  --repo <owner/name>             comment 的目标仓库
+  --issue <编号>                  comment 的目标 PR 编号
+  --dry-run                       只打印评论内容，不发起请求
   --force                         scan 忽略增量缓存，全量重扫
   --format md|csv                 export 的输出格式（默认 md）
   --out <file>                    export 写入文件
@@ -249,6 +254,61 @@ function cmdImport(parsed: ParsedArgs): number {
     print(`  未定价模型：${unpricedModels.join(', ')}（成本记为 n/a）`);
   }
   for (const warning of pricing.warnings) print(`⚠ ${warning}`);
+  return 0;
+}
+
+async function cmdComment(parsed: ParsedArgs): Promise<number> {
+  const month = resolveMonth(parsed.flags);
+  if (month === null) return 1;
+
+  const repo = flagStr(parsed.flags, 'repo');
+  if (repo === undefined || !/^[^/\s]+\/[^/\s]+$/.test(repo)) {
+    printErr('用法：token-ledger comment --repo <owner/name> --issue <编号>');
+    return 1;
+  }
+
+  const issueRaw = flagStr(parsed.flags, 'issue');
+  const issueNumber = issueRaw === undefined ? Number.NaN : Number(issueRaw);
+  if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
+    printErr('--issue 需要一个正整数（PR 编号）');
+    return 1;
+  }
+
+  const db = openDb();
+  const totals = queryTotals(db, month);
+  const body = buildCommentBody({
+    month,
+    totals,
+    byModel: aggregate(db, month, 'model'),
+    bySource: aggregate(db, month, 'source'),
+    budget: budgetStatus(db, month, totals.cost),
+    runUrl: process.env.TOKEN_LEDGER_RUN_URL,
+  });
+
+  if (parsed.flags['dry-run'] === true) {
+    print(body);
+    return 0;
+  }
+
+  const token = flagStr(parsed.flags, 'token') ?? process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+  if (token === undefined || token.trim() === '') {
+    printErr('缺少 token：请设置 GITHUB_TOKEN 环境变量，或用 --token 传入');
+    return 1;
+  }
+
+  const result = await upsertComment({
+    repo,
+    issueNumber,
+    body,
+    token,
+    apiUrl: flagStr(parsed.flags, 'api-url'),
+  });
+
+  if (parsed.flags.json === true) {
+    print(JSON.stringify(result, null, 2));
+    return 0;
+  }
+  print(`已${result.action === 'created' ? '发布' : '更新'}评论：${result.url ?? '(无链接)'}`);
   return 0;
 }
 
@@ -448,7 +508,7 @@ function cmdDoctor(parsed: ParsedArgs): number {
   return 0;
 }
 
-function main(): number {
+async function main(): Promise<number> {
   const parsed = parseArgs(process.argv.slice(2));
 
   if (parsed.flags.version === true || parsed.flags.v === true) {
@@ -471,6 +531,8 @@ function main(): number {
       return cmdScan(parsed);
     case 'import':
       return cmdImport(parsed);
+    case 'comment':
+      return cmdComment(parsed);
     case 'report':
       return cmdReport(parsed);
     case 'budget':
@@ -489,9 +551,11 @@ function main(): number {
   }
 }
 
-try {
-  process.exitCode = main();
-} catch (err) {
-  printErr(`出错了：${(err as Error).message}`);
-  process.exitCode = 1;
-}
+main()
+  .then((code) => {
+    process.exitCode = code;
+  })
+  .catch((err: unknown) => {
+    printErr(`出错了：${(err as Error).message}`);
+    process.exitCode = 1;
+  });

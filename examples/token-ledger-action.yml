@@ -1,0 +1,29 @@
+# 示例：在 PR 里自动评论 AI 用量
+#
+# 用法：把这个文件复制到你的仓库 .github/workflows/ 下，
+# 把下面 uses 里的 owner 换成部署了本 Action 的仓库。
+name: token-ledger
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write # 发表评论需要
+
+jobs:
+  spend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ⬇️ 这里放你跑 AI agent 的步骤（例如 claude-code-action）。
+      #    只有 agent 在 CI 里跑过，runner 上才会有日志可供扫描。
+      # - uses: some-org/ai-agent-action@v1
+
+      - uses: 1416459545-bot/token-ledger@v0.4.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # 如果用量数据不在 runner 上，先把它作为 artifact 下载下来再传进来：
+          # import-file: path/to/usage.jsonl
+          # month: 2026-11

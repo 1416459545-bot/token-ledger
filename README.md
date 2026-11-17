@@ -67,6 +67,7 @@ DAY         CALLS  TOKENS   COST
 | --- | --- |
 | `scan` | 扫描本地日志并入库（增量：没改动的文件自动跳过） |
 | `import <file.jsonl>` | 导入任意工具的用量数据（通用 JSONL 格式） |
+| `comment` | 在 PR 里发布/更新用量评论（供 GitHub Action 使用） |
 | `report` | 看某个月的账，默认本月 |
 | `budget set <金额>` | 设定月度预算（美元） |
 | `budget show` | 看余额、剩余天数、日均还能花多少 |
@@ -137,6 +138,55 @@ node src/cli.ts import usage.jsonl --project my-app
 - **重复导入不会重复记账**：主键是内容哈希。
 - 没写 `project` 的行可以用 `--project` 统一补上。
 
+## GitHub Action：在 PR 里看 token 花费
+
+仓库根目录就是 Action 本体（composite action，零依赖、无需构建）：
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write # 发评论需要
+
+steps:
+  - uses: actions/checkout@v4
+
+  # 这里放你跑 AI agent 的步骤（如果有）
+
+  - uses: 1416459545-bot/token-ledger@v0.4.0
+    with:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+      # import-file: path/to/usage.jsonl
+```
+
+评论长这样，且 **同一条评论会被更新而不是刷屏**：
+
+```markdown
+### 🍚 Token 账本 · 2026-11
+
+| 调用次数 | Tokens | 预估花费 |
+| --- | --- | --- |
+| 7 | 184.3K | $3.69 |
+
+**按模型**
+| 模型 | Tokens | 预估花费 |
+| --- | --- | --- |
+| `claude-opus-5-5` | 182.4K | $3.69 |
+| `gpt-5.1-codex-max` | 1.9K | $0.01 |
+```
+
+⚠️ **数据从哪来**（这条必须说清楚）：Action 跑在 GitHub runner 上，**看不到你本地的日志**。两条路：
+
+1. **AI agent 就在 CI 里跑**（例如 claude-code-action）→ 日志落在 runner 上，直接可用；
+2. 用量在别处 → 先作为 artifact 下载，再用 `import-file` 传入通用 JSONL。
+
+没找到数据时，评论会明确写「没有找到可统计的用量记录」，而不是贴一个 0。
+
+本地预览评论内容（不发起请求）：
+
+```bash
+node src/cli.ts comment --repo owner/repo --issue 1 --dry-run
+```
+
 ## 隐私承诺
 
 这是本项目**唯一不可妥协的设计**：
@@ -199,7 +249,7 @@ TOKEN_LEDGER_HOME=~/my-ledger node src/cli.ts report
 - [x] **v0.1** — Claude Code 源、报表、预算、导出、白饭彩蛋
 - [x] **v0.2** — Codex CLI 源、`import` 通用导入、多源 `scan --source`
 - [ ] **v0.3** — 单文件 HTML 看板（`serve`，仍不开服务器）
-- [ ] **v0.4** — GitHub Action：在 PR 里评论「这次改动花了多少 token」
+- [x] **v0.4** — GitHub Action：在 PR 里评论 token 用量与预估花费（同一条评论幂等更新）
 - [ ] 长期 — 多机同步（用户自带网盘）、团队视图
 
 ## 开发

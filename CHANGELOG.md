@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-17
+
+### Added
+
+- **GitHub Action**（composite，仓库根目录 `action.yml`）：在 PR 中评论 token 用量与预估花费
+  - 同一条评论按 marker 幂等更新，不会每次运行都刷一条
+  - 找不到数据时明确说明原因，而不是贴 0
+  - 支持 `import-file` 导入本地用量文件
+- `comment` 命令：`--dry-run` 可在本地预览评论内容
+
 ## [0.2.0] - 2026-11-17
 
 ### Added
