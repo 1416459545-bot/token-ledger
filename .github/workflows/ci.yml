@@ -31,11 +31,16 @@ jobs:
           node --version
           node -e "console.log('typescript support:', process.features.typescript ?? 'undefined')"
 
+      # 注意：必须 set -o pipefail，否则 | tee 会把测试的失败码吞掉，变成假绿
       - name: Test
-        run: node --test test 2>&1 | tee test.log
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test test 2>&1 | tee test.log
 
       - name: Test summary
         if: always()
+        shell: bash
         run: |
           {
             echo "### Node ${{ matrix.node }}"
@@ -45,9 +50,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke test on fixtures
-        if: always()
         run: |
           node src/cli.ts doctor
           node src/cli.ts scan
           node src/cli.ts report --month 2026-11
-          node src/cli.ts export --format csv
+          node src/cli.ts export --format csv > /dev/null
