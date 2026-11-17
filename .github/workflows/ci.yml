@@ -57,3 +57,5 @@ jobs:
           node src/cli.ts scan
           node src/cli.ts report --month 2026-11
           node src/cli.ts export --format csv > /dev/null
+          # 验证 GitHub 评论正文能生成（不发请求）
+          node src/cli.ts comment --repo example/repo --issue 1 --dry-run | grep -q "token-ledger:comment"
