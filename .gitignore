@@ -9,6 +9,9 @@ coverage/
 .token-ledger/
 .tmp/
 
+# 本地导出的看板文件
+token-ledger-*.html
+
 # 编辑器 / 系统
 .DS_Store
 Thumbs.db

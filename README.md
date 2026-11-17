@@ -72,7 +72,7 @@ DAY         CALLS  TOKENS   COST
 | `budget set <金额>` | 设定月度预算（美元） |
 | `budget show` | 看余额、剩余天数、日均还能花多少 |
 | `budget clear` | 清掉预算 |
-| `export` | 导出 Markdown / CSV 账单 |
+| `export` | 导出 Markdown / CSV / 单文件 HTML 看板 |
 | `rice` | 看看这个月吃了几碗白饭（1 碗 = 100 万 tokens） |
 | `doctor` | 诊断：路径对不对、数据量、价格表状态 |
 
@@ -89,6 +89,19 @@ node src/cli.ts report --json                 # 机器可读
 ```
 
 运行 `node src/cli.ts help` 看完整列表。
+
+## 单文件 HTML 看板
+
+```bash
+node src/cli.ts export --format html --month 2026-11
+# 已写入 token-ledger-2026-11.html（默认文件名，可用 --out 指定）
+```
+
+一份**完全自包含**的 HTML：零外部 CSS / JS / 字体 / 图片，**断网双击就能打开**，自动适配深色 / 浅色主题。
+
+![看板截图](docs/dashboard.png)
+
+> 默认写文件而不是输出到终端——PowerShell 的 `>` 重定向会写成 UTF-16，会把页面弄坏。
 
 ## 它做什么 / 不做什么
 
@@ -248,7 +261,7 @@ TOKEN_LEDGER_HOME=~/my-ledger node src/cli.ts report
 
 - [x] **v0.1** — Claude Code 源、报表、预算、导出、白饭彩蛋
 - [x] **v0.2** — Codex CLI 源、`import` 通用导入、多源 `scan --source`
-- [ ] **v0.3** — 单文件 HTML 看板（`serve`，仍不开服务器）
+- [x] **v0.3** — 单文件 HTML 看板（在 0.5.0 中交付：`export --format html`）
 - [x] **v0.4** — GitHub Action：在 PR 里评论 token 用量与预估花费（同一条评论幂等更新）
 - [ ] 长期 — 多机同步（用户自带网盘）、团队视图
 

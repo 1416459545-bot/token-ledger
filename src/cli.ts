@@ -11,6 +11,7 @@ import { parseImportFile } from './sources/generic.ts';
 import { buildCommentBody, upsertComment } from './github/comment.ts';
 import { renderReport } from './output/report.ts';
 import { renderCsv, renderMarkdown } from './output/markdown.ts';
+import { renderHtml } from './output/html.ts';
 import { DEFAULT_BOWL_SIZE, renderRice } from './output/rice.ts';
 import { renderTable } from './output/table.ts';
 import { currentMonth, formatInt, formatTokens, formatUsd, normalizeMonth } from './util/format.ts';
@@ -108,7 +109,7 @@ const HELP = `token-ledger · 本地优先的 AI token 花费账本
   --issue <编号>                  comment 的目标 PR 编号
   --dry-run                       只打印评论内容，不发起请求
   --force                         scan 忽略增量缓存，全量重扫
-  --format md|csv                 export 的输出格式（默认 md）
+  --format md|csv|html             export 的输出格式（默认 md）
   --out <file>                    export 写入文件
   --json                          机器可读输出（scan / report）
   --bowl-size <n>                 rice 里一碗等于多少 tokens（默认 1000000）
@@ -427,25 +428,41 @@ function cmdExport(parsed: ParsedArgs): number {
   if (month === null) return 1;
 
   const format = flagStr(parsed.flags, 'format') ?? 'md';
-  if (format !== 'md' && format !== 'csv') {
-    printErr('--format 只能是 md 或 csv');
+  if (format !== 'md' && format !== 'csv' && format !== 'html') {
+    printErr('--format 只能是 md / csv / html');
     return 1;
   }
 
   const db = openDb();
   const totals = queryTotals(db, month);
-  const content =
-    format === 'md'
-      ? renderMarkdown({
-          month,
-          totals,
-          byModel: aggregate(db, month, 'model'),
-          byProject: aggregate(db, month, 'project'),
-          budget: budgetStatus(db, month, totals.cost),
-        })
-      : renderCsv(detailRows(db, month));
 
-  const outFile = flagStr(parsed.flags, 'out');
+  let content: string;
+  if (format === 'html') {
+    content = renderHtml({
+      month,
+      generatedAt: new Date().toLocaleString('zh-CN'),
+      totals,
+      byModel: aggregate(db, month, 'model'),
+      byDay: aggregate(db, month, 'day'),
+      byProject: aggregate(db, month, 'project'),
+      bySource: aggregate(db, month, 'source'),
+      budget: budgetStatus(db, month, totals.cost),
+      unpriced: unpricedModels(db, month),
+    });
+  } else if (format === 'csv') {
+    content = renderCsv(detailRows(db, month));
+  } else {
+    content = renderMarkdown({
+      month,
+      totals,
+      byModel: aggregate(db, month, 'model'),
+      byProject: aggregate(db, month, 'project'),
+      budget: budgetStatus(db, month, totals.cost),
+    });
+  }
+
+  // HTML 默认写成文件：PowerShell 的 `>` 重定向会写成 UTF-16，直接把页面弄坏
+  const outFile = flagStr(parsed.flags, 'out') ?? (format === 'html' ? `token-ledger-${month}.html` : undefined);
   if (outFile !== undefined) {
     const target = path.resolve(expandHome(outFile));
     fs.writeFileSync(target, `${content}\n`, 'utf8');
