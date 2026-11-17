@@ -1,0 +1,48 @@
+name: 功能建议
+description: 提一个功能或新数据源
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先说一句：这个项目的原则是**少做功能、做透一个**。
+        如果你的建议是「再加一个监控指标」，可能会被婉拒；如果是「让它回答一个新问题」，非常欢迎。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决什么问题
+      description: 描述痛点，而不是直接给方案
+      placeholder: 我每次月底都想知道还剩多少额度，但现在只能翻 provider 后台。
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你希望的方案
+      placeholder: 例如 `token-ledger budget show --json` 输出剩余额度
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及部分
+      options:
+        - 数据源（新的 CLI / 日志格式）
+        - 报表与聚合
+        - 预算与告警
+        - 价格表
+        - 导出
+        - 文档
+        - 其他
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: 你愿意贡献吗
+      options:
+        - label: 我愿意提 PR
+        - label: 我可以提供测试日志（已脱敏）

@@ -1,0 +1,40 @@
+{
+  "name": "token-ledger",
+  "version": "0.1.0",
+  "description": "本地优先的 AI token 花费账本：把你的 token 汇成一册，算出这个月还能吃几碗白饭。",
+  "type": "module",
+  "bin": {
+    "token-ledger": "./src/cli.ts",
+    "tl": "./src/cli.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node src/cli.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "doctor": "node src/cli.ts doctor"
+  },
+  "keywords": [
+    "token",
+    "usage",
+    "cost",
+    "ledger",
+    "claude-code",
+    "codex",
+    "llm",
+    "cli",
+    "local-first"
+  ],
+  "license": "MIT",
+  "author": "Token Ledger contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/<your-name>/token-ledger.git"
+  }
+}

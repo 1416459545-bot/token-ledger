@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+
+# 账本数据：永远不要提交
+*.db
+*.db-wal
+*.db-shm
+.token-ledger/
+.tmp/
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log

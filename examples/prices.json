@@ -1,0 +1,18 @@
+{
+  "models": {
+    "claude-opus-5-5": {
+      "provider": "anthropic",
+      "input": 15,
+      "output": 75,
+      "cacheRead": 1.5,
+      "cacheWrite": 18.75
+    },
+    "my-local-model": {
+      "provider": "self-hosted",
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+    }
+  }
+}

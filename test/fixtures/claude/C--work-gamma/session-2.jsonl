@@ -1,0 +1,2 @@
+{"type":"assistant","uuid":"b1","timestamp":"2026-10-05T08:00:00.000Z","sessionId":"s2","message":{"id":"msg_100","model":"gpt-4o-mini","role":"assistant","usage":{"input_tokens":100,"output_tokens":50}}}
+{"type":"assistant","uuid":"b2","timestamp":"2026-10-05T08:01:00.000Z","sessionId":"s2","message":{"id":"msg_101","model":"some-unknown-model","role":"assistant","usage":{"input_tokens":200,"output_tokens":20}}}
