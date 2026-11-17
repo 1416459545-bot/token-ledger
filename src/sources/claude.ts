@@ -4,16 +4,11 @@ import path from 'node:path';
 import type { UsageEvent } from '../core/types.ts';
 import { isoToLocalDay } from '../util/format.ts';
 import { shortHash } from '../util/hash.ts';
+import { lastSegment } from '../util/pathname.ts';
+import type { ParseStats, UsageSource } from './types.ts';
 
 export const SOURCE_NAME = 'claude-code';
 export const DEFAULT_PROVIDER = 'anthropic';
-
-export interface ParseStats {
-  lines: number;
-  /** 被跳过的行数（非 assistant、synthetic、零消耗、坏行） */
-  skipped: number;
-  events: number;
-}
 
 /** Claude Code 本地会话日志目录。 */
 export function defaultClaudeRoot(): string {
@@ -71,18 +66,6 @@ export function cacheWriteTokensOf(usage: Record<string, unknown>): number {
     return sum;
   }
   return 0;
-}
-
-/**
- * 取路径最后一段，**同时兼容 Windows 反斜杠与 POSIX 斜杠**。
- * 不能用 path.basename：它只认当前平台的分隔符，在 Linux 上遇到 `C:\work\alpha` 会原样返回。
- */
-function lastSegment(p: string): string {
-  const parts = p
-    .replace(/[\\/]+$/, '')
-    .split(/[\\/]/)
-    .filter((segment) => segment !== '');
-  return parts.length > 0 ? parts[parts.length - 1] : '';
 }
 
 /** 从 `cwd` 或会话目录名推断项目名。 */
@@ -189,3 +172,11 @@ export function parseClaudeFile(filePath: string): { events: UsageEvent[]; stats
   }
   return { events, stats };
 }
+
+export const claudeSource: UsageSource = {
+  name: SOURCE_NAME,
+  label: 'Claude Code',
+  defaultRoot: defaultClaudeRoot,
+  findFiles: findJsonlFiles,
+  parseFile: parseClaudeFile,
+};

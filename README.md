@@ -80,7 +80,8 @@ DAY         CALLS  TOKENS   COST
 ```bash
 node src/cli.ts report --month 2026-10        # 指定月份
 node src/cli.ts report --by project           # 只看某一个维度
-node src/cli.ts scan --root ~/my-logs         # 自定义日志目录
+node src/cli.ts scan --source codex         # 只扫某一个数据源（claude-code / codex / all）
+node src/cli.ts scan --source codex --root ~/my-logs  # 自定义日志目录（需配合 --source）
 node src/cli.ts scan --force                  # 忽略增量缓存，全量重扫
 node src/cli.ts export --format csv --out 2026-11.csv
 node src/cli.ts report --json                 # 机器可读
@@ -93,6 +94,7 @@ node src/cli.ts report --json                 # 机器可读
 **支持：**
 
 - ✅ Claude Code（`~/.claude/projects` 下的 `.jsonl` 会话日志）
+- ✅ Codex CLI（`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`）
 - ✅ 输入 / 输出 / 缓存读 / 缓存写 四类 token 分开记账
 - ✅ 跨项目、跨模型、跨天聚合
 - ✅ 预算与「日均还能吃多少」
@@ -102,7 +104,7 @@ node src/cli.ts report --json                 # 机器可读
 
 **暂不支持：**
 
-- ❌ Codex CLI / Gemini CLI（v0.2）
+- ❌ Gemini CLI 等其它数据源（Roadmap）
 - ❌ 代理模式（拦截真实请求）
 - ❌ Web 界面、团队协作、云同步
 
@@ -195,7 +197,7 @@ TOKEN_LEDGER_HOME=~/my-ledger node src/cli.ts report
 ## Roadmap
 
 - [x] **v0.1** — Claude Code 源、报表、预算、导出、白饭彩蛋
-- [ ] **v0.2** — Codex CLI / Gemini CLI 源，价格表自动更新
+- [x] **v0.2** — Codex CLI 源、`import` 通用导入、多源 `scan --source`
 - [ ] **v0.3** — 单文件 HTML 看板（`serve`，仍不开服务器）
 - [ ] **v0.4** — GitHub Action：在 PR 里评论「这次改动花了多少 token」
 - [ ] 长期 — 多机同步（用户自带网盘）、团队视图

@@ -5,8 +5,15 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-17
+
 ### Added
 
+- **Codex CLI 数据源**：解析 `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
+  - 按 `total_token_usage` 做增量差分计费，同一回合重复发出的 `token_count` 不会重复记账
+  - `input_tokens` 中拆出缓存命中（`cached_input_tokens`）与缓存写入（`cache_write_input_tokens`）
+  - 模型取自 `turn_context.payload.model`，项目名取自 `cwd`
+- 多数据源架构：`scan --source claude-code|codex|all`，`doctor` 列出各数据源状态
 - `import <file.jsonl>`：通用 JSONL 用量导入。任何工具导出的用量都能进账本，主键为内容哈希，重复导入不重复记账
 
 ### Fixed

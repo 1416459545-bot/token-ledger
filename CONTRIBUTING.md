@@ -21,15 +21,17 @@ node src/cli.ts doctor
 
 ## 新增数据源
 
-1. 在 `src/sources/` 下新建 `xxx.ts`，导出：
-   - `findJsonlFiles(root)` 类似的发现函数
-   - `parseXxxFile(filePath)` → `{ events: UsageEvent[], stats }`
-2. 解析器必须遵守三条铁律：
+1. 在 `src/sources/` 下新建 `xxx.ts`，实现 `UsageSource` 接口（见 `src/sources/types.ts`）：
+   - `name` / `label`
+   - `defaultRoot()` —— 日志默认目录（支持环境变量覆盖更好）
+   - `findFiles(root)` —— 递归找出该源的日志文件
+   - `parseFile(filePath)` → `{ events: UsageEvent[], stats }`
+2. 在 `src/sources/index.ts` 的 `SOURCES` 数组里注册。
+3. 解析器必须遵守三条铁律：
    - **只取 token 数字和元数据，绝不读取 prompt / 回复正文**
    - 坏行只计数、不中断（真实日志里一定有脏数据）
    - 事件主键必须稳定且幂等：`xxx:<message.id>` 或内容哈希
-3. 在 `src/core/scanner.ts` 里接上，并补 `test/` 下的 fixture + 测试。
-4. 在 README 的「支持」列表里打勾。
+4. 补 `test/` 下的 fixture + 测试，并在 README 的「支持」列表里打勾。
 
 > 判定标准很简单：`node src/cli.ts scan && node src/cli.ts report` 能在真实日志上跑出合理的数字。
 

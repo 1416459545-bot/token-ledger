@@ -5,8 +5,8 @@ import { openDb, dbFile } from './core/db.ts';
 import { aggregate, detailRows, eventCount, insertEvents, listMonths, totals as queryTotals, unpricedModels } from './core/ledger.ts';
 import { budgetStatus, clearBudget, setBudget } from './core/budget.ts';
 import { loadPricing } from './core/pricing.ts';
-import { priceEvents, scanClaude } from './core/scanner.ts';
-import { defaultClaudeRoot, findJsonlFiles } from './sources/claude.ts';
+import { priceEvents, scanSources } from './core/scanner.ts';
+import { SOURCES, SOURCE_NAMES, findSource } from './sources/index.ts';
 import { parseImportFile } from './sources/generic.ts';
 import { renderReport } from './output/report.ts';
 import { renderCsv, renderMarkdown } from './output/markdown.ts';
@@ -99,7 +99,8 @@ const HELP = `token-ledger · 本地优先的 AI token 花费账本
 选项
   --month YYYY-MM                 指定月份
   --by model|project|day|source   report 只看某一个维度
-  --root <dir>                    scan 的日志目录
+  --source claude-code|codex|all  scan 的数据源（默认 all）
+  --root <dir>                    scan 的日志目录（需配合 --source 指定单个数据源）
   --project <名称>                import 时给没有 project 字段的记录补上归属
   --force                         scan 忽略增量缓存，全量重扫
   --format md|csv                 export 的输出格式（默认 md）
@@ -142,35 +143,62 @@ function resolveMonth(flags: Flags): string | null {
 
 function cmdScan(parsed: ParsedArgs): number {
   const home = ledgerHome();
-  const requestedRoot = flagStr(parsed.flags, 'root') ?? defaultClaudeRoot();
-  const root = path.resolve(expandHome(requestedRoot));
   const db = openDb(home);
   const pricing = loadPricing(home);
 
-  const summary = scanClaude({ db, root, force: parsed.flags.force === true, prices: pricing.entries });
+  const sourceFlag = flagStr(parsed.flags, 'source') ?? 'all';
+  let sources = SOURCES;
+  if (sourceFlag !== 'all') {
+    const found = findSource(sourceFlag);
+    if (found === undefined) {
+      printErr(`未知数据源：${sourceFlag}（可用：all / ${SOURCE_NAMES.join(' / ')}）`);
+      return 1;
+    }
+    sources = [found];
+  }
+
+  const rootFlag = flagStr(parsed.flags, 'root');
+  if (rootFlag !== undefined && sources.length > 1) {
+    printErr('--root 需要配合 --source 指定单个数据源，例如：--source claude-code --root <dir>');
+    return 1;
+  }
+  const rootOverride = rootFlag !== undefined ? path.resolve(expandHome(rootFlag)) : undefined;
+
+  const summary = scanSources({
+    db,
+    sources,
+    force: parsed.flags.force === true,
+    prices: pricing.entries,
+    rootOverride,
+  });
 
   if (parsed.flags.json === true) {
     print(JSON.stringify(summary, null, 2));
     return 0;
   }
 
-  print(`扫描 ${summary.filesTotal} 个日志文件`);
-  print(`  新扫 ${summary.filesScanned} · 跳过（未变化）${summary.filesSkipped} · 新增记录 ${summary.inserted}`);
+  print(`扫描 ${summary.results.length} 个数据源`);
+  for (const result of summary.results) {
+    const parts = [`${result.filesTotal} 个文件`, `新增 ${result.inserted}`];
+    if (result.filesSkipped > 0) parts.push(`跳过 ${result.filesSkipped}（未变化）`);
+    print(`  ${result.label.padEnd(12)} ${parts.join(' · ')}`);
+    if (result.filesTotal === 0) print(`  ${''.padEnd(12)} 没找到日志：${result.root}`);
+  }
+  print(`合计新增 ${summary.inserted} 条`);
 
-  if (summary.filesTotal === 0) {
+  const unpriced = [...new Set(summary.results.flatMap((result) => result.unpricedModels))];
+  if (unpriced.length > 0) {
     print('');
-    print(`没在 ${root} 找到 .jsonl 日志。`);
-    print('确认 Claude Code 日志目录，或用 --root 指定。');
-  }
-  if (summary.unreadableFiles.length > 0) {
-    print(`  ⚠ ${summary.unreadableFiles.length} 个文件处理失败`);
-    for (const f of summary.unreadableFiles.slice(0, 3)) print(`    ${f}`);
-  }
-  if (summary.unpricedModels.length > 0) {
-    print('');
-    print(`这些模型没有价格，成本已记为 n/a：${summary.unpricedModels.join(', ')}`);
+    print(`这些模型没有价格，成本已记为 n/a：${unpriced.join(', ')}`);
     print('补价格：~/.token-ledger/prices.json，格式见 README「自定义价格表」');
   }
+
+  const failures = summary.results.flatMap((result) => result.unreadableFiles);
+  if (failures.length > 0) {
+    print(`  ⚠ ${failures.length} 个文件处理失败`);
+    for (const failure of failures.slice(0, 3)) print(`    ${failure}`);
+  }
+
   for (const warning of pricing.warnings) print(`⚠ ${warning}`);
   print('');
   print(`账本：${dbFile(home)}`);
@@ -386,8 +414,6 @@ function cmdRice(parsed: ParsedArgs): number {
 function cmdDoctor(parsed: ParsedArgs): number {
   const home = ledgerHome();
   const file = dbFile(home);
-  const claudeRoot = path.resolve(expandHome(flagStr(parsed.flags, 'root') ?? defaultClaudeRoot()));
-  const logFiles = findJsonlFiles(claudeRoot);
   const pricing = loadPricing(home);
 
   let events = 0;
@@ -407,7 +433,16 @@ function cmdDoctor(parsed: ParsedArgs): number {
     `数据库       ${fs.existsSync(file) ? humanSize(fs.statSync(file).size) : '（尚未创建）'} · ${formatInt(events)} 条记录`,
   );
   print(`月份         ${months.length > 0 ? months.join(', ') : '（空）'}`);
-  print(`Claude 日志  ${claudeRoot} · ${logFiles.length} 个 .jsonl`);
+  print('数据源');
+  const rootFlag = flagStr(parsed.flags, 'root');
+  for (const source of SOURCES) {
+    const root =
+      rootFlag !== undefined && SOURCES.length === 1
+        ? path.resolve(expandHome(rootFlag))
+        : source.defaultRoot();
+    const files = source.findFiles(root);
+    print(`  ${source.label.padEnd(12)} ${files.length} 个日志 · ${root}`);
+  }
   print(`价格表       ${pricing.source}${pricing.customFile !== null ? `（${pricing.customFile}）` : ''}`);
   for (const warning of pricing.warnings) print(`  ⚠ ${warning}`);
   return 0;
