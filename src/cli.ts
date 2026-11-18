@@ -2,8 +2,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { openDb, dbFile } from './core/db.ts';
-import { aggregate, detailRows, eventCount, insertEvents, listMonths, totals as queryTotals, unpricedModels } from './core/ledger.ts';
+import {
+  aggregate,
+  aggregateRange,
+  detailRowsRange,
+  eventCount,
+  insertEvents,
+  listEventsRange,
+  listMonths,
+  monthlyTotals,
+  totals as queryTotals,
+  totalsRange,
+  unpricedModels,
+  unpricedModelsRange,
+} from './core/ledger.ts';
 import { budgetStatus, clearBudget, setBudget } from './core/budget.ts';
+import type { Period } from './core/period.ts';
+import { explicitPeriod, lastDaysPeriod, monthPeriod, parseLastDays } from './core/period.ts';
 import { loadPricing } from './core/pricing.ts';
 import { priceEvents, scanSources } from './core/scanner.ts';
 import { SOURCES, SOURCE_NAMES, findSource } from './sources/index.ts';
@@ -12,6 +27,7 @@ import { buildCommentBody, upsertComment } from './github/comment.ts';
 import { renderReport } from './output/report.ts';
 import { renderCsv, renderMarkdown } from './output/markdown.ts';
 import { renderHtml } from './output/html.ts';
+import { renderJsonl } from './output/jsonl.ts';
 import { DEFAULT_BOWL_SIZE, renderRice } from './output/rice.ts';
 import { renderTable } from './output/table.ts';
 import { currentMonth, formatInt, formatTokens, formatUsd, normalizeMonth } from './util/format.ts';
@@ -101,6 +117,9 @@ const HELP = `token-ledger · 本地优先的 AI token 花费账本
 
 选项
   --month YYYY-MM                 指定月份
+  --last 7d                       最近 N 天（含今天）
+  --since YYYY-MM-DD              区间起点（配合 --until）
+  --until YYYY-MM-DD              区间终点
   --by model|project|day|source   report 只看某一个维度
   --source claude-code|codex|all  scan 的数据源（默认 all）
   --root <dir>                    scan 的日志目录（需配合 --source 指定单个数据源）
@@ -109,7 +128,7 @@ const HELP = `token-ledger · 本地优先的 AI token 花费账本
   --issue <编号>                  comment 的目标 PR 编号
   --dry-run                       只打印评论内容，不发起请求
   --force                         scan 忽略增量缓存，全量重扫
-  --format md|csv|html             export 的输出格式（默认 md）
+  --format md|csv|jsonl|html       export 的输出格式（默认 md）
   --out <file>                    export 写入文件
   --json                          机器可读输出（scan / report）
   --bowl-size <n>                 rice 里一碗等于多少 tokens（默认 1000000）
@@ -145,6 +164,59 @@ function resolveMonth(flags: Flags): string | null {
     return null;
   }
   return normalized;
+}
+
+/**
+ * 解析统计区间。三种写法互斥：
+ *   --month 2026-11        整月
+ *   --last 7d              最近 7 天（含今天）
+ *   --since X --until Y    任意区间（只给 since 则到今天就结束；只给 until 则统计那一天）
+ */
+function resolvePeriod(flags: Flags): Period | null {
+  const lastRaw = flagStr(flags, 'last');
+  const since = flagStr(flags, 'since');
+  const until = flagStr(flags, 'until');
+  const monthRaw = flagStr(flags, 'month');
+
+  const modes = [
+    lastRaw !== undefined,
+    since !== undefined || until !== undefined,
+    monthRaw !== undefined,
+  ].filter(Boolean).length;
+
+  if (modes > 1) {
+    printErr('--month / --last / --since(--until) 只能选一种');
+    return null;
+  }
+
+  if (lastRaw !== undefined) {
+    const days = parseLastDays(lastRaw);
+    if (days === null) {
+      printErr(`--last 格式不对：${lastRaw}（示例：7d / 30d）`);
+      return null;
+    }
+    return lastDaysPeriod(days);
+  }
+
+  if (since !== undefined || until !== undefined) {
+    const period = explicitPeriod(since ?? null, until ?? null);
+    if (period === null) {
+      printErr('--since / --until 日期不合法（应为 YYYY-MM-DD，且 since ≤ until）');
+      return null;
+    }
+    return period;
+  }
+
+  if (monthRaw !== undefined) {
+    const month = normalizeMonth(monthRaw);
+    if (month === null) {
+      printErr(`月份格式不对：${monthRaw}（应为 YYYY-MM，例如 ${currentMonth()}）`);
+      return null;
+    }
+    return monthPeriod(month);
+  }
+
+  return monthPeriod(currentMonth());
 }
 
 function cmdScan(parsed: ParsedArgs): number {
@@ -314,8 +386,8 @@ async function cmdComment(parsed: ParsedArgs): Promise<number> {
 }
 
 function cmdReport(parsed: ParsedArgs): number {
-  const month = resolveMonth(parsed.flags);
-  if (month === null) return 1;
+  const period = resolvePeriod(parsed.flags);
+  if (period === null) return 1;
 
   const by = flagStr(parsed.flags, 'by');
   if (by !== undefined && !VALID_BY.includes(by as GroupBy)) {
@@ -324,14 +396,15 @@ function cmdReport(parsed: ParsedArgs): number {
   }
 
   const db = openDb();
-  const totals = queryTotals(db, month);
+  const range = { start: period.start, end: period.end };
+  const totals = totalsRange(db, range);
 
   if (by !== undefined) {
-    const rows = aggregate(db, month, by as GroupBy);
-    print(`Token 账本 · ${month} · 按 ${by}`);
+    const rows = aggregateRange(db, range, by as GroupBy);
+    print(`Token 账本 · ${period.label} · 按 ${by}`);
     print('─'.repeat(40));
     if (rows.length === 0) {
-      print('本月没有记录。');
+      print('这个区间没有记录。');
       return 0;
     }
     print(
@@ -345,13 +418,13 @@ function cmdReport(parsed: ParsedArgs): number {
   }
 
   const data = {
-    month,
+    label: period.label,
     totals,
-    byModel: aggregate(db, month, 'model'),
-    byDay: aggregate(db, month, 'day'),
-    byProject: aggregate(db, month, 'project'),
-    budget: budgetStatus(db, month, totals.cost),
-    unpriced: unpricedModels(db, month),
+    byModel: aggregateRange(db, range, 'model'),
+    byDay: aggregateRange(db, range, 'day'),
+    byProject: aggregateRange(db, range, 'project'),
+    budget: period.month !== null ? budgetStatus(db, period.month, totals.cost) : null,
+    unpriced: unpricedModelsRange(db, range),
   };
 
   if (parsed.flags.json === true) {
@@ -424,45 +497,52 @@ function cmdBudget(parsed: ParsedArgs): number {
 }
 
 function cmdExport(parsed: ParsedArgs): number {
-  const month = resolveMonth(parsed.flags);
-  if (month === null) return 1;
+  const period = resolvePeriod(parsed.flags);
+  if (period === null) return 1;
 
   const format = flagStr(parsed.flags, 'format') ?? 'md';
-  if (format !== 'md' && format !== 'csv' && format !== 'html') {
-    printErr('--format 只能是 md / csv / html');
+  if (format !== 'md' && format !== 'csv' && format !== 'jsonl' && format !== 'html') {
+    printErr('--format 只能是 md / csv / jsonl / html');
     return 1;
   }
 
   const db = openDb();
-  const totals = queryTotals(db, month);
+  const range = { start: period.start, end: period.end };
+  const totals = totalsRange(db, range);
+  const budget = period.month !== null ? budgetStatus(db, period.month, totals.cost) : null;
 
   let content: string;
   if (format === 'html') {
     content = renderHtml({
-      month,
+      label: period.label,
       generatedAt: new Date().toLocaleString('zh-CN'),
       totals,
-      byModel: aggregate(db, month, 'model'),
-      byDay: aggregate(db, month, 'day'),
-      byProject: aggregate(db, month, 'project'),
-      bySource: aggregate(db, month, 'source'),
-      budget: budgetStatus(db, month, totals.cost),
-      unpriced: unpricedModels(db, month),
+      byModel: aggregateRange(db, range, 'model'),
+      byDay: aggregateRange(db, range, 'day'),
+      byProject: aggregateRange(db, range, 'project'),
+      bySource: aggregateRange(db, range, 'source'),
+      budget,
+      unpriced: unpricedModelsRange(db, range),
+      trend: monthlyTotals(db, 6),
     });
   } else if (format === 'csv') {
-    content = renderCsv(detailRows(db, month));
+    content = renderCsv(detailRowsRange(db, range));
+  } else if (format === 'jsonl') {
+    content = renderJsonl(listEventsRange(db, range));
   } else {
     content = renderMarkdown({
-      month,
+      label: period.label,
       totals,
-      byModel: aggregate(db, month, 'model'),
-      byProject: aggregate(db, month, 'project'),
-      budget: budgetStatus(db, month, totals.cost),
+      byModel: aggregateRange(db, range, 'model'),
+      byProject: aggregateRange(db, range, 'project'),
+      budget,
     });
   }
 
   // HTML 默认写成文件：PowerShell 的 `>` 重定向会写成 UTF-16，直接把页面弄坏
-  const outFile = flagStr(parsed.flags, 'out') ?? (format === 'html' ? `token-ledger-${month}.html` : undefined);
+  const suffix = period.month ?? `${period.start}_${period.end}`;
+  const outFile =
+    flagStr(parsed.flags, 'out') ?? (format === 'html' ? `token-ledger-${suffix}.html` : undefined);
   if (outFile !== undefined) {
     const target = path.resolve(expandHome(outFile));
     fs.writeFileSync(target, `${content}\n`, 'utf8');

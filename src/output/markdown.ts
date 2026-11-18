@@ -3,7 +3,8 @@ import type { DetailRow } from '../core/ledger.ts';
 import { formatInt, formatTokens, formatUsd } from '../util/format.ts';
 
 export interface MarkdownData {
-  month: string;
+  /** 区间标签，例如 `2026-11` 或 `2026-11-01 ~ 2026-11-15` */
+  label: string;
   totals: {
     events: number;
     input: number;
@@ -15,7 +16,7 @@ export interface MarkdownData {
   };
   byModel: AggregateRow[];
   byProject: AggregateRow[];
-  budget: { hasBudget: boolean; budget: number; spent: number; remaining: number };
+  budget: { hasBudget: boolean; budget: number; spent: number; remaining: number } | null;
 }
 
 const mdTable = (headers: string[], rows: string[][]): string[] => [
@@ -27,7 +28,7 @@ const mdTable = (headers: string[], rows: string[][]): string[] => [
 export function renderMarkdown(data: MarkdownData): string {
   const { totals } = data;
   const out: string[] = [];
-  out.push(`# Token 账本 · ${data.month}`);
+  out.push(`# Token 账本 · ${data.label}`);
   out.push('');
   out.push(
     `本月合计 **${formatTokens(totals.tokens)} tokens**，预估 **${formatUsd(totals.cost)}**，共 ${formatInt(
@@ -70,7 +71,7 @@ export function renderMarkdown(data: MarkdownData): string {
     );
   }
 
-  if (data.budget.hasBudget) {
+  if (data.budget !== null && data.budget.hasBudget) {
     out.push('');
     out.push('## 预算');
     out.push('');

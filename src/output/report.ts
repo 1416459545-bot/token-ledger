@@ -4,12 +4,14 @@ import { formatInt, formatTokens, formatUsd } from '../util/format.ts';
 import { renderTable } from './table.ts';
 
 export interface ReportData {
-  month: string;
+  /** 区间标签，例如 `2026-11` 或 `2026-11-01 ~ 2026-11-15` */
+  label: string;
   totals: Totals;
   byModel: AggregateRow[];
   byDay: AggregateRow[];
   byProject: AggregateRow[];
-  budget: BudgetStatus;
+  /** 只有统计区间恰好是完整自然月时才有预算信息 */
+  budget: BudgetStatus | null;
   unpriced: { model: string; count: number }[];
 }
 
@@ -32,15 +34,15 @@ function simpleRows(rows: AggregateRow[], limit: number): string[][] {
 }
 
 export function renderReport(data: ReportData): string {
-  const { totals, month } = data;
-  const title = `Token 账本 · ${month}`;
+  const { totals } = data;
+  const title = `Token 账本 · ${data.label}`;
   const rule = '─'.repeat(Math.max(32, Math.min(60, title.length + 24)));
 
   if (totals.events === 0) {
     return [
       title,
       rule,
-      '本月还没有任何记录。',
+      '这个区间还没有任何记录。',
       '',
       '先扫一遍本地日志：',
       '  token-ledger scan',
@@ -75,19 +77,21 @@ export function renderReport(data: ReportData): string {
   out.push('按天');
   out.push(renderTable(['DAY', 'CALLS', 'TOKENS', 'COST'], simpleRows(data.byDay, 31), [1, 2, 3]));
 
-  out.push('');
-  out.push('预算');
-  if (!data.budget.hasBudget) {
-    out.push('  还没设预算。试试：token-ledger budget set 50');
-  } else {
-    const b = data.budget;
-    out.push(
-      `  月预算 ${formatUsd(b.budget)} · 已花 ${formatUsd(b.spent)} · 剩余 ${formatUsd(b.remaining)}`,
-    );
-    if (b.overBudget) {
-      out.push(`  ⚠ 已超支 ${formatUsd(Math.abs(b.remaining))}，本鱼劝你少说两句废话。`);
-    } else if (b.daysLeft > 0) {
-      out.push(`  含今天还剩 ${b.daysLeft} 天 → 每天还能吃 ${formatUsd(b.dailyAllowance)}`);
+  if (data.budget !== null) {
+    out.push('');
+    out.push('预算');
+    if (!data.budget.hasBudget) {
+      out.push('  还没设预算。试试：token-ledger budget set 50');
+    } else {
+      const b = data.budget;
+      out.push(
+        `  月预算 ${formatUsd(b.budget)} · 已花 ${formatUsd(b.spent)} · 剩余 ${formatUsd(b.remaining)}`,
+      );
+      if (b.overBudget) {
+        out.push(`  ⚠ 已超支 ${formatUsd(Math.abs(b.remaining))}。`);
+      } else if (b.daysLeft > 0) {
+        out.push(`  含今天还剩 ${b.daysLeft} 天 → 每天还能吃 ${formatUsd(b.dailyAllowance)}`);
+      }
     }
   }
 

@@ -33,7 +33,7 @@ const modelRow: AggregateRow = {
 
 function data(overrides: Partial<ReportData> = {}): ReportData {
   return {
-    month: '2026-11',
+    label: '2026-11',
     totals,
     byModel: [modelRow],
     byDay: [{ ...modelRow, key: '2026-11-02' }],
@@ -82,7 +82,7 @@ test('空月份给出下一步指引，而不是空白', () => {
       byProject: [],
     }),
   );
-  assert.match(out, /本月还没有任何记录/);
+  assert.match(out, /这个区间还没有任何记录/);
   assert.match(out, /token-ledger scan/);
 });
 
@@ -94,7 +94,7 @@ test('未定价模型会给出补价格提示', () => {
 
 test('markdown 导出含标题、表格与免责声明', () => {
   const md = renderMarkdown({
-    month: '2026-11',
+    label: '2026-11',
     totals,
     byModel: [modelRow],
     byProject: [{ ...modelRow, key: 'alpha' }],

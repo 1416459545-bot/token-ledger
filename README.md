@@ -72,7 +72,7 @@ DAY         CALLS  TOKENS   COST
 | `budget set <金额>` | 设定月度预算（美元） |
 | `budget show` | 看余额、剩余天数、日均还能花多少 |
 | `budget clear` | 清掉预算 |
-| `export` | 导出 Markdown / CSV / 单文件 HTML 看板 |
+| `export` | 导出 Markdown / CSV / JSONL / 单文件 HTML 看板 |
 | `rice` | 看看这个月吃了几碗白饭（1 碗 = 100 万 tokens） |
 | `doctor` | 诊断：路径对不对、数据量、价格表状态 |
 
@@ -80,6 +80,8 @@ DAY         CALLS  TOKENS   COST
 
 ```bash
 node src/cli.ts report --month 2026-10        # 指定月份
+node src/cli.ts report --last 7d              # 最近 7 天（含今天）
+node src/cli.ts report --since 2026-11-01 --until 2026-11-15  # 任意区间
 node src/cli.ts report --by project           # 只看某一个维度
 node src/cli.ts scan --source codex         # 只扫某一个数据源（claude-code / codex / all）
 node src/cli.ts scan --source codex --root ~/my-logs  # 自定义日志目录（需配合 --source）
@@ -89,6 +91,38 @@ node src/cli.ts report --json                 # 机器可读
 ```
 
 运行 `node src/cli.ts help` 看完整列表。
+
+## 时间区间
+
+除了整月，还能看任意区间：
+
+```bash
+node src/cli.ts report --last 7d                              # 最近 7 天
+node src/cli.ts report --since 2026-11-01 --until 2026-11-15  # 任意区间
+node src/cli.ts export --format html --last 30d               # 近 30 天的看板
+```
+
+- `--month` / `--last` / `--since(--until)` **三选一**，同时给会报错。
+- 只给 `--since` 就统计到今天；只给 `--until` 就统计那一天。
+- 区间不是完整自然月时**不显示月度预算**（预算本身是月度的，硬套没有意义）。
+- HTML 看板会额外画出**近 6 个月趋势**。
+
+## 多机合并
+
+两台电脑各有一个账本？`export --format jsonl` 导出的是**事件级**数据，格式与 `import` 完全兼容：
+
+```bash
+# 机器 A
+node src/cli.ts export --format jsonl --month 2026-11 --out from-a.jsonl
+
+# 机器 B
+node src/cli.ts import from-a.jsonl
+node src/cli.ts report --month 2026-11
+```
+
+- 事件主键是内容哈希，**重复导入不会重复记账**，可以反复合并、放心重跑。
+- 只导出 token 数字与元数据，**不含任何 prompt / 回复内容**。
+- 来源标识会保留：合并后 `claude-code` / `codex` 不会被抹成 `import`。
 
 ## 单文件 HTML 看板
 
@@ -263,7 +297,8 @@ TOKEN_LEDGER_HOME=~/my-ledger node src/cli.ts report
 - [x] **v0.2** — Codex CLI 源、`import` 通用导入、多源 `scan --source`
 - [x] **v0.3** — 单文件 HTML 看板（在 0.5.0 中交付：`export --format html`）
 - [x] **v0.4** — GitHub Action：在 PR 里评论 token 用量与预估花费（同一条评论幂等更新）
-- [ ] 长期 — 多机同步（用户自带网盘）、团队视图
+- [x] **v0.6** — 时间区间（`--last` / `--since` / `--until`）、多机合并（`export --format jsonl`）、6 个月趋势图
+- [ ] 长期 — 云同步（用户自带网盘）、团队视图
 
 ## 开发
 

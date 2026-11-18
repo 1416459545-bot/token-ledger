@@ -3,15 +3,19 @@ import type { AggregateRow, Totals } from '../core/types.ts';
 import { formatInt, formatTokens, formatUsd } from '../util/format.ts';
 
 export interface HtmlReportData {
-  month: string;
+  /** 区间标签，例如 `2026-11` 或 `2026-11-01 ~ 2026-11-15` */
+  label: string;
   generatedAt: string;
   totals: Totals;
   byModel: AggregateRow[];
   byDay: AggregateRow[];
   byProject: AggregateRow[];
   bySource: AggregateRow[];
-  budget: BudgetStatus;
+  /** 只有统计区间恰好是完整自然月时才有预算信息 */
+  budget: BudgetStatus | null;
   unpriced: { model: string; count: number }[];
+  /** 近几个月的总量，用于趋势图（少于 2 个月不渲染） */
+  trend?: { month: string; tokens: number; cost: number }[];
 }
 
 /** HTML 转义：模型名/项目名可能包含任意字符。 */
@@ -113,10 +117,25 @@ export function renderHtml(data: HtmlReportData): string {
     formatUsd(row.cost),
   ]);
 
+  const budget = data.budget;
   const budgetPct =
-    data.budget.hasBudget && data.budget.budget > 0
-      ? Math.min(100, Math.round((data.budget.spent / data.budget.budget) * 100))
+    budget !== null && budget.hasBudget && budget.budget > 0
+      ? Math.min(100, Math.round((budget.spent / budget.budget) * 100))
       : 0;
+
+  const trendRows = data.trend ?? [];
+  const trendMax = trendRows.reduce((max, row) => Math.max(max, row.tokens), 0);
+  const trendSection =
+    trendRows.length >= 2
+      ? `<h2>近 ${trendRows.length} 个月趋势</h2>
+  <div class="chart">${trendRows
+    .map((row) => {
+      const pct = trendMax > 0 ? Math.max(2, Math.round((row.tokens / trendMax) * 100)) : 0;
+      const tip = `${row.month} · ${formatTokens(row.tokens)} tokens · ${formatUsd(row.cost)}`;
+      return `<div class="bar-col" title="${escapeHtml(tip)}"><div class="bar" style="height:${pct}%"></div><div class="bar-label">${escapeHtml(row.month.slice(2))}</div></div>`;
+    })
+    .join('')}</div>`
+      : '';
 
   const unpricedNote =
     data.unpriced.length > 0
@@ -133,32 +152,33 @@ export function renderHtml(data: HtmlReportData): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Token 账本 · ${escapeHtml(data.month)}</title>
+<title>Token 账本 · ${escapeHtml(data.label)}</title>
 <style>${STYLE}</style>
 </head>
 <body>
 <main>
   <header>
     <h1>🍚 Token 账本</h1>
-    <p class="sub">${escapeHtml(data.month)} · 生成于 ${escapeHtml(data.generatedAt)}</p>
+    <p class="sub">${escapeHtml(data.label)} · 生成于 ${escapeHtml(data.generatedAt)}</p>
   </header>
 
   <section class="cards">
     <div class="card"><div class="k">Tokens</div><div class="v">${formatTokens(totals.tokens)}</div></div>
     <div class="card"><div class="k">预估花费</div><div class="v">${formatUsd(totals.cost)}</div></div>
     <div class="card"><div class="k">调用次数</div><div class="v">${formatInt(totals.events)}</div></div>
-    <div class="card"><div class="k">${data.budget.hasBudget ? '预算剩余' : '预算'}</div><div class="v">${
-      data.budget.hasBudget ? formatUsd(data.budget.remaining) : '未设置'
+    <div class="card"><div class="k">${budget === null ? '预算' : budget.hasBudget ? '预算剩余' : '预算'}</div><div class="v">${
+      budget === null ? '—' : budget.hasBudget ? formatUsd(budget.remaining) : '未设置'
     }</div></div>
   </section>
 
   ${
     empty
-      ? '<p class="hint">本月还没有任何记录。先运行 <code>token-ledger scan</code>。</p>'
+      ? '<p class="hint">这个区间还没有任何记录。先运行 <code>token-ledger scan</code>。</p>'
       : `
   <h2>每日用量</h2>
   <div class="chart">${bars}</div>
 
+  ${trendSection}
   <h2>按模型</h2>
   ${table(['模型', 'Input', 'Output', 'Cache 读', 'Cache 写', 'Tokens', '成本'], modelRows)}
 
@@ -171,17 +191,17 @@ export function renderHtml(data: HtmlReportData): string {
   }
 
   ${
-    data.budget.hasBudget
+    budget !== null && budget.hasBudget
       ? `<h2>预算</h2>
   <div class="budget">
     <div class="track"><div class="fill" style="width:${budgetPct}%"></div></div>
-    <p>月预算 ${formatUsd(data.budget.budget)} · 已花 ${formatUsd(data.budget.spent)} · 剩余 ${formatUsd(
-      data.budget.remaining,
+    <p>月预算 ${formatUsd(budget.budget)} · 已花 ${formatUsd(budget.spent)} · 剩余 ${formatUsd(
+      budget.remaining,
     )}${
-      data.budget.overBudget
-        ? ` · ⚠ 已超支 ${formatUsd(Math.abs(data.budget.remaining))}`
-        : data.budget.daysLeft > 0
-          ? ` · 含今天还剩 ${data.budget.daysLeft} 天，每天 ${formatUsd(data.budget.dailyAllowance)}`
+      budget.overBudget
+        ? ` · ⚠ 已超支 ${formatUsd(Math.abs(budget.remaining))}`
+        : budget.daysLeft > 0
+          ? ` · 含今天还剩 ${budget.daysLeft} 天，每天 ${formatUsd(budget.dailyAllowance)}`
           : ''
     }</p>
   </div>`

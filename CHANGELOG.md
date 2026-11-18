@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-18
+
+### Added
+
+- **时间区间**：`report` / `export` 支持 `--last 7d`、`--since`、`--until`（三者与 `--month` 互斥）
+  - 区间不是完整自然月时不显示月度预算
+- **多机合并**：`export --format jsonl` 事件级导出，与 `import` 互通；内容哈希保证重复导入幂等
+  - 导出保留 `source`，合并后不会把来源抹成 `import`
+- HTML 看板新增「近 N 个月趋势」图
+- 区间查询 API：`totalsRange` / `aggregateRange` / `detailRowsRange` / `listEventsRange` / `monthlyTotals` / `unpricedModelsRange`
+
 ## [0.5.0] - 2026-11-17
 
 ### Added

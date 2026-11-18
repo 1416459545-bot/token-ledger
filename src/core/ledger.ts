@@ -1,5 +1,17 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { daysInMonth } from '../util/format.ts';
 import type { AggregateRow, GroupBy, Totals, UsageEvent } from './types.ts';
+
+/** 一个闭区间，边界是本地日期 `YYYY-MM-DD`。 */
+export interface Range {
+  start: string;
+  end: string;
+}
+
+export function monthToRange(month: string): Range {
+  const last = daysInMonth(month);
+  return { start: `${month}-01`, end: `${month}-${String(last).padStart(2, '0')}` };
+}
 
 /** 批量入库，幂等：同一 id 只记一次。返回真正新增的条数。 */
 export function insertEvents(db: DatabaseSync, events: UsageEvent[]): number {
@@ -93,8 +105,8 @@ function toAggregateRow(raw: Record<string, unknown>): AggregateRow {
   };
 }
 
-/** 按维度聚合某个月的消耗。 */
-export function aggregate(db: DatabaseSync, month: string, by: GroupBy): AggregateRow[] {
+/** 按维度聚合某个时间区间。 */
+export function aggregateRange(db: DatabaseSync, range: Range, by: GroupBy): AggregateRow[] {
   const col = GROUP_COLUMNS[by];
   const order = by === 'day' ? 'key ASC' : 'SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens) DESC';
   const rows = db
@@ -108,16 +120,21 @@ export function aggregate(db: DatabaseSync, month: string, by: GroupBy): Aggrega
               SUM(cost_usd) AS cost,
               SUM(CASE WHEN cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced
          FROM events
-        WHERE month = ?
+        WHERE day >= ? AND day <= ?
         GROUP BY key
         ORDER BY ${order}`,
     )
-    .all(month) as Record<string, unknown>[];
+    .all(range.start, range.end) as Record<string, unknown>[];
   return rows.map(toAggregateRow);
 }
 
-/** 某月总计。 */
-export function totals(db: DatabaseSync, month: string): Totals {
+/** 按维度聚合某个月。 */
+export function aggregate(db: DatabaseSync, month: string, by: GroupBy): AggregateRow[] {
+  return aggregateRange(db, monthToRange(month), by);
+}
+
+/** 某区间的总计。 */
+export function totalsRange(db: DatabaseSync, range: Range): Totals {
   const raw = db
     .prepare(
       `SELECT COUNT(*) AS events,
@@ -127,10 +144,15 @@ export function totals(db: DatabaseSync, month: string): Totals {
               COALESCE(SUM(cache_write_tokens), 0) AS cacheWrite,
               COALESCE(SUM(cost_usd), 0) AS cost,
               COALESCE(SUM(CASE WHEN cost_usd IS NULL THEN 1 ELSE 0 END), 0) AS unpriced
-         FROM events WHERE month = ?`,
+         FROM events WHERE day >= ? AND day <= ?`,
     )
-    .get(month) as Record<string, unknown>;
-  return toAggregateRow({ key: month, ...raw });
+    .get(range.start, range.end) as Record<string, unknown>;
+  return toAggregateRow({ key: `${range.start}~${range.end}`, ...raw });
+}
+
+/** 某月总计。 */
+export function totals(db: DatabaseSync, month: string): Totals {
+  return totalsRange(db, monthToRange(month));
 }
 
 export interface DetailRow {
@@ -148,8 +170,8 @@ export interface DetailRow {
   unpriced: number;
 }
 
-/** 按 天 × 模型 × 项目 × 来源 的明细聚合，供 CSV / Markdown 导出。 */
-export function detailRows(db: DatabaseSync, month: string): DetailRow[] {
+/** 按 天 × 模型 × 项目 × 来源 的明细聚合（区间），供 CSV / Markdown 导出。 */
+export function detailRowsRange(db: DatabaseSync, range: Range): DetailRow[] {
   const rows = db
     .prepare(
       `SELECT day, model, COALESCE(NULLIF(project, ''), '(未标注)') AS project, source,
@@ -161,11 +183,11 @@ export function detailRows(db: DatabaseSync, month: string): DetailRow[] {
               SUM(cost_usd) AS cost,
               SUM(CASE WHEN cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced
          FROM events
-        WHERE month = ?
+        WHERE day >= ? AND day <= ?
         GROUP BY day, model, project, source
         ORDER BY day ASC, SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens) DESC`,
     )
-    .all(month) as Record<string, unknown>[];
+    .all(range.start, range.end) as Record<string, unknown>[];
 
   return rows.map((raw) => {
     const input = Number(raw.input ?? 0);
@@ -189,16 +211,86 @@ export function detailRows(db: DatabaseSync, month: string): DetailRow[] {
   });
 }
 
-/** 未定价的模型及其记录数（用于提示补价格表）。 */
-export function unpricedModels(db: DatabaseSync, month: string): { model: string; count: number }[] {
+/** 某个月的明细聚合。 */
+export function detailRows(db: DatabaseSync, month: string): DetailRow[] {
+  return detailRowsRange(db, monthToRange(month));
+}
+
+/** 导出用：按时间顺序取出区间内的原始事件（不含任何 prompt 内容）。 */
+export function listEventsRange(db: DatabaseSync, range: Range): UsageEvent[] {
+  const rows = db
+    .prepare(
+      `SELECT id, ts, source, provider, model, project, session_id,
+              input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd
+         FROM events
+        WHERE day >= ? AND day <= ?
+        ORDER BY ts ASC, id ASC`,
+    )
+    .all(range.start, range.end) as Record<string, unknown>[];
+
+  return rows.map((raw) => ({
+    id: String(raw.id ?? ''),
+    ts: String(raw.ts ?? ''),
+    source: String(raw.source ?? ''),
+    provider: String(raw.provider ?? ''),
+    model: String(raw.model ?? ''),
+    project: raw.project === null || raw.project === undefined ? null : String(raw.project),
+    sessionId: raw.session_id === null || raw.session_id === undefined ? null : String(raw.session_id),
+    inputTokens: Number(raw.input_tokens ?? 0),
+    outputTokens: Number(raw.output_tokens ?? 0),
+    cacheReadTokens: Number(raw.cache_read_tokens ?? 0),
+    cacheWriteTokens: Number(raw.cache_write_tokens ?? 0),
+    costUsd: raw.cost_usd === null || raw.cost_usd === undefined ? null : Number(raw.cost_usd),
+  }));
+}
+
+export interface MonthTotals {
+  month: string;
+  events: number;
+  tokens: number;
+  cost: number;
+}
+
+/** 最近 N 个月的用量，按月份升序返回（供趋势图用）。 */
+export function monthlyTotals(db: DatabaseSync, limit: number): MonthTotals[] {
+  const rows = db
+    .prepare(
+      `SELECT month,
+              COUNT(*) AS events,
+              SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens) AS tokens,
+              SUM(cost_usd) AS cost
+         FROM events
+        GROUP BY month
+        ORDER BY month DESC
+        LIMIT ?`,
+    )
+    .all(limit) as Record<string, unknown>[];
+
+  return rows
+    .map((raw) => ({
+      month: String(raw.month ?? ''),
+      events: Number(raw.events ?? 0),
+      tokens: Number(raw.tokens ?? 0),
+      cost: round6(Number(raw.cost ?? 0)),
+    }))
+    .reverse();
+}
+
+/** 未定价的模型及其记录数（区间）。 */
+export function unpricedModelsRange(db: DatabaseSync, range: Range): { model: string; count: number }[] {
   const rows = db
     .prepare(
       `SELECT model, COUNT(*) AS count FROM events
-        WHERE month = ? AND cost_usd IS NULL
+        WHERE day >= ? AND day <= ? AND cost_usd IS NULL
         GROUP BY model ORDER BY count DESC`,
     )
-    .all(month) as Record<string, unknown>[];
+    .all(range.start, range.end) as Record<string, unknown>[];
   return rows.map((r) => ({ model: String(r.model), count: Number(r.count) }));
+}
+
+/** 未定价的模型及其记录数（用于提示补价格表）。 */
+export function unpricedModels(db: DatabaseSync, month: string): { model: string; count: number }[] {
+  return unpricedModelsRange(db, monthToRange(month));
 }
 
 /** 账本里出现过的月份，倒序。 */

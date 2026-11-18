@@ -66,16 +66,28 @@ export function parseImportLine(raw: unknown, project: string | null = null): Us
   const provider = text(obj.provider) ?? 'unknown';
   const projectName = text(obj.project) ?? project;
   const sessionId = text(pick(obj, ['session_id', 'sessionId']));
+  // 保留来源标识：`export --format jsonl` 导出的文件再导入时，来源不会退化成 import
+  const source = text(obj.source) ?? IMPORT_SOURCE;
 
   // 内容哈希做主键：同一文件重复导入不会重复记账
   const id = `${IMPORT_SOURCE}:${shortHash(
-    JSON.stringify([ts, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, projectName, sessionId]),
+    JSON.stringify([
+      ts,
+      source,
+      model,
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
+      projectName,
+      sessionId,
+    ]),
   )}`;
 
   return {
     id,
     ts,
-    source: IMPORT_SOURCE,
+    source,
     provider,
     model,
     project: projectName,

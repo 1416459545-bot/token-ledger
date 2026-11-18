@@ -18,7 +18,7 @@ const row: AggregateRow = {
 
 function data(overrides: Partial<HtmlReportData> = {}): HtmlReportData {
   return {
-    month: '2026-11',
+    label: '2026-11',
     generatedAt: '2026-11-17 20:30:00',
     totals: {
       events: 3,
@@ -103,7 +103,7 @@ test('没有数据时给出指引而不是空白页', () => {
       bySource: [],
     }),
   );
-  assert.match(html, /本月还没有任何记录/);
+  assert.match(html, /这个区间还没有任何记录/);
   assert.match(html, /token-ledger scan/);
 });
 
