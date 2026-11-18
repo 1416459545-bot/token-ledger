@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-18
+
+### Fixed
+
+- **装下来跑不起来**：此前 `bin` 指向 `.ts` 源码，而 Node 禁止在 `node_modules` 内做类型剥离
+  （`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`），任何人通过 `npx`/`npm i -g` 安装都会直接报错。
+  现在改用 `tsc` 编译到 `dist/`，`bin` 指向编译产物；仓库内仍可直接 `node src/cli.ts` 开发。
+
+### Changed
+
+- 新增开发依赖 `typescript` 与 `@types/node`（**运行时依赖仍然为零**）
+- 新增 `npm run build`、`npm run typecheck`；`prepublishOnly` 会先构建再跑测试
+- CI 增加 `npm ci` + 构建步骤，并额外用编译产物跑一遍冒烟测试
+
 ## [0.7.0] - 2026-11-18
 
 ### Fixed

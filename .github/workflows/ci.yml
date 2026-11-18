@@ -31,6 +31,12 @@ jobs:
           node --version
           node -e "console.log('typescript support:', process.features.typescript ?? 'undefined')"
 
+      - name: Install dev dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
       # node --test 用默认发现（test/**/*.test.*）。
       # 不要用 `node --test test`：Node 24 不把目录当目录，会报 MODULE_NOT_FOUND。
       # 必须 set -o pipefail，否则 | tee 会把失败码吞掉变成假绿。
@@ -59,5 +65,8 @@ jobs:
           node src/cli.ts export --format csv > /dev/null
           node src/cli.ts export --format html --out /tmp/report.html
           test -s /tmp/report.html
+          # 编译产物也要能跑（用户装到的就是它）
+          node dist/cli.js --version
+          node dist/cli.js report --month 2026-11 > /dev/null
           # 验证 GitHub 评论正文能生成（不发请求）
           node src/cli.ts comment --repo example/repo --issue 1 --dry-run | grep -q "token-ledger:comment"

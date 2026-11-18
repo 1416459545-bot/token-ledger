@@ -1,25 +1,25 @@
 {
   "name": "token-ledger",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "本地优先的 AI token 花费账本：把你的 token 汇成一册，算出这个月还能吃几碗白饭。",
   "type": "module",
   "bin": {
-    "token-ledger": "./src/cli.ts",
-    "tl": "./src/cli.ts"
+    "token-ledger": "./dist/cli.js",
+    "tl": "./dist/cli.js"
   },
   "files": [
-    "src",
-    "README.md",
-    "LICENSE"
+    "dist"
   ],
   "engines": {
     "node": ">=22.18.0"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "start": "node src/cli.ts",
     "test": "node --test",
+    "typecheck": "tsc -p tsconfig.json",
     "doctor": "node src/cli.ts doctor",
-    "prepublishOnly": "node --test"
+    "prepublishOnly": "npm run build && node --test"
   },
   "keywords": [
     "token",
@@ -41,5 +41,9 @@
   "homepage": "https://github.com/1416459545-bot/token-ledger#readme",
   "bugs": {
     "url": "https://github.com/1416459545-bot/token-ledger/issues"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
   }
 }
