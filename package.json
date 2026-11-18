@@ -1,6 +1,6 @@
 {
   "name": "token-ledger",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "本地优先的 AI token 花费账本：把你的 token 汇成一册，算出这个月还能吃几碗白饭。",
   "type": "module",
   "bin": {

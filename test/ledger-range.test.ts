@@ -35,11 +35,16 @@ function ev(id: string, ts: string, overrides: Partial<UsageEvent> = {}): UsageE
   };
 }
 
+/** 用本地时间构造时间戳：保证任意时区下都落在预期的本地日期上。 */
+function localTs(y: number, m: number, d: number, hour = 12): string {
+  return new Date(y, m - 1, d, hour, 0, 0).toISOString();
+}
+
 const EVENTS: UsageEvent[] = [
-  ev('e1', '2026-10-30T10:00:00.000Z', { inputTokens: 1000 }),
-  ev('e2', '2026-11-02T10:00:00.000Z', { inputTokens: 100 }),
-  ev('e3', '2026-11-15T23:00:00.000Z', { inputTokens: 200 }),
-  ev('e4', '2026-11-16T01:00:00.000Z', { inputTokens: 300, costUsd: null, model: 'mystery' }),
+  ev('e1', localTs(2026, 10, 30), { inputTokens: 1000 }),
+  ev('e2', localTs(2026, 11, 2), { inputTokens: 100 }),
+  ev('e3', localTs(2026, 11, 15, 23), { inputTokens: 200 }),
+  ev('e4', localTs(2026, 11, 16, 1), { inputTokens: 300, costUsd: null, model: 'mystery' }),
 ];
 
 test('区间统计只包含区间内的事件（边界闭区间）', () => {

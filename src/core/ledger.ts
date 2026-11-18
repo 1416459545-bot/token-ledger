@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { daysInMonth } from '../util/format.ts';
+import { daysInMonth, isoToLocalDay } from '../util/format.ts';
 import type { AggregateRow, GroupBy, Totals, UsageEvent } from './types.ts';
 
 /** 一个闭区间，边界是本地日期 `YYYY-MM-DD`。 */
@@ -26,7 +26,8 @@ export function insertEvents(db: DatabaseSync, events: UsageEvent[]): number {
   db.exec('BEGIN');
   try {
     for (const e of events) {
-      const day = e.ts.slice(0, 10);
+      // 按本地时区分桶：不能用 ISO 字符串前 10 位（那是 UTC 日期）
+      const day = isoToLocalDay(e.ts) || e.ts.slice(0, 10);
       const month = day.slice(0, 7);
       const result = stmt.run(
         e.id,
