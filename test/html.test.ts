@@ -109,7 +109,7 @@ test('没有数据时给出指引而不是空白页', () => {
 
 test('没设预算时不渲染预算区块', () => {
   const html = renderHtml(
-    data({ budget: { ...data().budget, hasBudget: false, budget: 0, remaining: 0 } }),
+    data({ budget: { ...data().budget!, hasBudget: false, budget: 0, remaining: 0 } }),
   );
   assert.ok(!html.includes('预算剩余'));
   assert.ok(!html.includes('<h2>预算</h2>'));
@@ -117,7 +117,7 @@ test('没设预算时不渲染预算区块', () => {
 
 test('超支时会显示警告', () => {
   const html = renderHtml(
-    data({ budget: { ...data().budget, budget: 1, spent: 2, remaining: -1, overBudget: true } }),
+    data({ budget: { ...data().budget!, budget: 1, spent: 2, remaining: -1, overBudget: true } }),
   );
   assert.match(html, /已超支/);
 });

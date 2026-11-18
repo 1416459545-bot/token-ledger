@@ -1,7 +1,18 @@
 node_modules/
 dist/
+dist-electron/
+release/
 coverage/
 *.tgz
+
+# Tauri / Rust 构建产物
+src-tauri/target/
+
+# 前端打包产物（由 npm run ui:build 生成）
+ui/app.js
+
+# 本地构建的桌面程序
+*.exe
 
 # 账本数据：永远不要提交
 *.db
@@ -19,3 +30,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# Tauri ���ɵ� ACL schema������ʱ�Զ��ؽ���
+src-tauri/gen/

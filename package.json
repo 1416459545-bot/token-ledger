@@ -1,6 +1,6 @@
 {
   "name": "token-ledger",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "本地优先的 AI token 花费账本：把你的 token 汇成一册，算出这个月还能吃几碗白饭。",
   "type": "module",
   "bin": {
@@ -21,7 +21,11 @@
     "test": "node --test",
     "typecheck": "tsc -p tsconfig.json",
     "doctor": "node src/cli.ts doctor",
-    "prepublishOnly": "npm run build && node --test"
+    "prepublishOnly": "npm run build && node --test",
+    "ui:build": "node scripts/build-ui.mjs",
+    "app:build": "node scripts/build-ui.mjs && tauri build --no-bundle",
+    "app:bundle": "node scripts/build-ui.mjs && tauri build",
+    "app:dev": "node scripts/build-ui.mjs && tauri dev"
   },
   "keywords": [
     "token",
@@ -45,7 +49,13 @@
     "url": "https://github.com/1416459545-bot/token-ledger/issues"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.5",
     "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.2.0": true,
+    "esbuild@0.28.2": true
   }
 }

@@ -98,6 +98,26 @@ node src/cli.ts report --json                 # 机器可读
 
 运行 `node src/cli.ts help` 看完整列表。
 
+## 桌面应用（Tauri 单文件 exe）
+
+除了 CLI，还有一个**免安装的单文件 exe**（约 4 MB）：界面就是上面那个 HTML 看板。
+
+```bash
+npm run ui:build     # 打包前端（ui/app.ts → ui/app.js）
+npm run app:dev      # 开发模式启动
+npm run app:build    # 构建 release exe → src-tauri/target/release/token-ledger-app.exe
+npm run app:bundle   # 构建并打安装包（NSIS）
+```
+
+技术栈：**Rust 后端（Tauri）+ 现有 TypeScript 渲染逻辑**。
+
+- Rust 只负责 SQL 聚合查询，直接读取同一个账本 `~/.token-ledger/ledger.db`
+- 前端直接复用 `src/core/period.ts`（区间计算）和 `src/output/html.ts`（看板渲染），不重复实现
+- 右下角工具栏：本月 / 7 天 / 30 天 / 刷新 / 导出
+- 需要系统已安装 **WebView2 运行时**（Windows 10/11 通常自带）
+
+> 桌面版目前是**只读展示**：扫描仍由 CLI 负责（`node src/cli.ts scan`），两边共用同一份账本。
+
 ## 时间区间
 
 除了整月，还能看任意区间：

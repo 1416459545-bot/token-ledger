@@ -1,0 +1,51 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-desktop:
+    name: 构建桌面版 exe 并发布
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 依赖
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建桌面版（单文件 exe）
+        run: npm run app:build
+
+      - name: 重命名产物
+        shell: pwsh
+        run: |
+          Copy-Item "src-tauri/target/release/token-ledger-app.exe" "token-ledger-desktop.exe"
+          Get-Item "token-ledger-desktop.exe" | Select-Object Name, Length
+
+      - name: 上传到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: token-ledger-desktop.exe
+          generate_release_notes: true
+          fail_on_unmatched_files: true

@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-18
+
+### Added
+
+- **桌面应用（Tauri）**：单文件免安装 exe（约 4 MB）
+  - Rust 后端只做 SQL 聚合，读取与 CLI 相同的账本 `~/.token-ledger/ledger.db`
+  - 前端直接复用 `src/core/period.ts`（区间计算）与 `src/output/html.ts`（看板渲染），不重复实现
+  - 工具栏提供 本月 / 7 天 / 30 天 / 刷新 / 导出
+  - 依赖系统 WebView2 运行时（Windows 10/11 自带）
+
+### Changed
+
+- 建表与迁移逻辑抽到 `src/core/schema.ts`（不绑定数据库驱动），CLI 与桌面端共用
+- 新增开发依赖：`@tauri-apps/cli`、`esbuild`；**运行时依赖仍为零**
+
 ## [0.8.0] - 2026-11-18
 
 ### Fixed
