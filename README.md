@@ -35,9 +35,14 @@ node src/cli.ts scan      # 扫描本地 Claude Code 日志
 node src/cli.ts report    # 看本月的账
 ```
 
-> 发布到 npm 之后就是一行：`npx token-ledger scan`
+> **还没发布到 npm，但可以直接从 GitHub 安装运行：**
 >
-> （不想污染全局，也没有 `npm install` 这一步——本项目没有任何运行时依赖。）
+> ```bash
+> npx github:1416459545-bot/token-ledger scan
+> npx github:1416459545-bot/token-ledger report
+> ```
+>
+> 安装时会自动构建（`prepare` 钩子），装完就是编译好的 JS，不需要你本机有 TypeScript。
 
 真实输出长这样：
 
