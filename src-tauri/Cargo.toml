@@ -1,6 +1,6 @@
 [package]
 name = "token-ledger-app"
-version = "0.9.1"
+version = "1.0.0"
 description = "Token 账本 桌面版"
 edition = "2021"
 rust-version = "1.77"
@@ -35,4 +35,5 @@ lto = true
 opt-level = "s"
 panic = "abort"
 strip = true
+
 

@@ -1,11 +1,19 @@
 # Token 账本 🍚
 
+[![CI](https://github.com/1416459545-bot/token-ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/1416459545-bot/token-ledger/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/1416459545-bot/token-ledger?label=release)](https://github.com/1416459545-bot/token-ledger/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A522.18-informational)](https://nodejs.org/)
+[![Runtime deps: 0](https://img.shields.io/badge/runtime%20deps-0-success)](package.json)
+
 **本地优先的个人 AI 花费账本。** 把各个 coding agent 烧掉的 token 汇成一册，回答一个官方账单页不回答的问题：**这个月还剩多少、还能撑几天。**
 
 > Token Ledger — a local-first ledger for the tokens your AI coding agents burn.
 > No account, no upload, no prompt content. Just numbers you own.
 
 零运行时依赖 · 一条命令 · 单一 SQLite 文件 · 不需要联网。
+
+> **状态：v1.0.0 稳定版** —— CLI 与桌面版（Windows，4 MB 单文件）均可日常使用。
 
 ---
 

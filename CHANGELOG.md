@@ -5,6 +5,26 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-18
+
+第一个稳定版：CLI 与桌面版都可以日常使用。
+
+### 能力
+
+- **CLI**：`scan` / `report` / `export` / `budget` / `doctor` / `comment`，零运行时依赖
+- **数据源**：Claude Code（`~/.claude/projects`）、Codex CLI（`~/.codex/sessions`）
+- **统计**：整月、最近 N 天、任意区间；按模型 / 日期 / 项目 / 数据源分组
+- **输出**：终端表格、Markdown、CSV、事件级 JSONL、单文件 HTML 看板
+- **桌面版**（Windows，约 4 MB 单文件）：自带扫描、免安装、含「导出」按钮
+- **多机合并**：`import` 事件级 JSONL，`INSERT OR IGNORE` 天然去重
+
+### 工程质量
+
+- 77 个单元测试，覆盖解析、计价、时区、区间、渲染、导入导出
+- CI：Node 24/26 双版本 + 冒烟测试；另有「扫描一致性（TS vs Rust）」对拍任务
+- 双实现一致性：CLI（TypeScript）与桌面版（Rust）产生的事件 id、字段、金额完全一致
+- 发布：推送 `v*` 标签即自动构建 exe 并上传 Release
+
 ## [0.9.1] - 2026-11-18
 
 ### Added

@@ -70,3 +70,32 @@ jobs:
           node dist/cli.js report --month 2026-11 > /dev/null
           # 验证 GitHub 评论正文能生成（不发请求）
           node src/cli.ts comment --repo example/repo --issue 1 --dry-run | grep -q "token-ledger:comment"
+
+  parity:
+    name: 扫描一致性（TS vs Rust）
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      - name: Install dev dependencies
+        run: npm ci
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # 桌面版与 CLI 共用同一个账本，事件 id / 金额必须完全一致，否则会重复计账
+      - name: Build tlscan
+        run: cargo build --bin tlscan --manifest-path src-tauri/Cargo.toml
+
+      - name: Verify parity
+        run: node scripts/verify-parity.mjs
+

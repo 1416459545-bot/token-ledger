@@ -1,6 +1,6 @@
 {
   "name": "token-ledger",
-  "version": "0.9.1",
+  "version": "1.0.0",
   "description": "本地优先的 AI token 花费账本：把你的 token 汇成一册，算出这个月还能吃几碗白饭。",
   "type": "module",
   "bin": {
@@ -25,7 +25,8 @@
     "ui:build": "node scripts/build-ui.mjs",
     "app:build": "node scripts/build-ui.mjs && tauri build --no-bundle",
     "app:bundle": "node scripts/build-ui.mjs && tauri build",
-    "app:dev": "node scripts/build-ui.mjs && tauri dev"
+    "app:dev": "node scripts/build-ui.mjs && tauri dev",
+    "verify:parity": "node scripts/verify-parity.mjs"
   },
   "keywords": [
     "token",
