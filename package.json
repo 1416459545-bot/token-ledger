@@ -18,7 +18,8 @@
   "scripts": {
     "start": "node src/cli.ts",
     "test": "node --test",
-    "doctor": "node src/cli.ts doctor"
+    "doctor": "node src/cli.ts doctor",
+    "prepublishOnly": "node --test"
   },
   "keywords": [
     "token",
@@ -36,5 +37,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/1416459545-bot/token-ledger.git"
+  },
+  "homepage": "https://github.com/1416459545-bot/token-ledger#readme",
+  "bugs": {
+    "url": "https://github.com/1416459545-bot/token-ledger/issues"
   }
 }
