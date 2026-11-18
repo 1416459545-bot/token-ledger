@@ -111,12 +111,23 @@ npm run app:bundle   # 构建并打安装包（NSIS）
 
 技术栈：**Rust 后端（Tauri）+ 现有 TypeScript 渲染逻辑**。
 
-- Rust 只负责 SQL 聚合查询，直接读取同一个账本 `~/.token-ledger/ledger.db`
+- Rust 只负责扫描与 SQL 聚合，读写同一个账本 `~/.token-ledger/ledger.db`
 - 前端直接复用 `src/core/period.ts`（区间计算）和 `src/output/html.ts`（看板渲染），不重复实现
-- 右下角工具栏：本月 / 7 天 / 30 天 / 刷新 / 导出
+- 右下角工具栏：本月 / 7 天 / 30 天 / **扫描** / 刷新 / 导出
+- 「扫描」按钮会读取本机 Claude Code / Codex CLI 日志并入库，增量、幂等
 - 需要系统已安装 **WebView2 运行时**（Windows 10/11 通常自带）
 
-> 桌面版目前是**只读展示**：扫描仍由 CLI 负责（`node src/cli.ts scan`），两边共用同一份账本。
+### 扫描逻辑的两套实现
+
+CLI 用 TypeScript、桌面版用 Rust，但**事件 id、字段、金额完全一致**（同一个数据库不会重复计账）。
+可以用无界面工具 `tlscan` 交叉验证：
+
+```bash
+cd src-tauri
+cargo build --bin tlscan
+./target/debug/tlscan scan          # 打印扫描摘要 JSON
+./target/debug/tlscan report --start 2026-11-01 --end 2026-11-30
+```
 
 ## 时间区间
 

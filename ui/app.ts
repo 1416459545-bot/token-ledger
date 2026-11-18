@@ -76,6 +76,7 @@ function injectToolbar(): void {
     <button data-kind="month">本月</button>
     <button data-kind="7d">7 天</button>
     <button data-kind="30d">30 天</button>
+    <button data-action="scan">扫描</button>
     <button data-action="refresh">刷新</button>
     <button data-action="export">导出</button>
   `;
@@ -100,10 +101,60 @@ function injectToolbar(): void {
       return;
     }
     if (target.dataset.action === 'refresh') void load();
+    if (target.dataset.action === 'scan') void runScan(target);
     if (target.dataset.action === 'export') exportHtml();
   });
 
   document.body.appendChild(bar);
+}
+
+/** 扫描本机日志（与 CLI 的 scan 同一套逻辑，Rust 实现） */
+async function runScan(button: HTMLButtonElement): Promise<void> {
+  const tauri = window.__TAURI__;
+  if (!tauri) return;
+
+  const original = button.textContent ?? '扫描';
+  button.textContent = '扫描中…';
+  button.disabled = true;
+
+  try {
+    const raw = await tauri.core.invoke<string>('scan_logs', { force: false });
+    const summary = JSON.parse(raw) as {
+      inserted: number;
+      results: { label: string; files_scanned: number; files_skipped: number; inserted: number }[];
+    };
+    const detail = summary.results
+      .map((r) => `${r.label} ${r.files_scanned} 个文件 +${r.inserted}`)
+      .join(' · ');
+    toast(`扫描完成：新增 ${summary.inserted} 条（${detail}）`);
+    await load();
+  } catch (err) {
+    toast(`扫描失败：${String(err)}`, true);
+  } finally {
+    button.textContent = original;
+    button.disabled = false;
+  }
+}
+
+let toastTimer: number | undefined;
+
+function toast(message: string, isError = false): void {
+  let el = document.getElementById('tl-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'tl-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.style.cssText =
+    'position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:10000;' +
+    'padding:10px 18px;border-radius:10px;font-size:13px;max-width:80vw;' +
+    `background:${isError ? '#5a1d1d' : '#1f2d1f'};color:${isError ? '#ffb3b3' : '#b3ffb3'};` +
+    'border:1px solid rgba(255,255,255,.12);box-shadow:0 6px 24px rgba(0,0,0,.4);';
+  if (toastTimer !== undefined) window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    el?.remove();
+  }, 4000);
 }
 
 function exportHtml(): void {
